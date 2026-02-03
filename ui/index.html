@@ -796,6 +796,25 @@
       <button id="save-project-paths-btn" class="action-btn">Save Project Paths</button>
       <div id="project-paths-status" style="margin-top:10px; padding:10px; background:var(--code); border-radius:4px; border:1px solid var(--border); display:none; color:var(--muted); font-size:12px;"></div>
     </div>
+
+    <div class="card">
+      <h3>Indexing</h3>
+      <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">Select a directory to build the document search index and choose which file extensions to include.</p>
+
+      <div style="display:flex; gap:8px; margin-bottom:8px;">
+        <input type="text" id="index-project-dir" placeholder="Select project directory to index" style="flex:1; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px;" />
+        <button id="browse-project-dir-btn" class="action-btn" style="white-space:nowrap;">Browse</button>
+      </div>
+
+      <label style="display:block; margin-bottom:6px; color:var(--text); font-weight:600;">File Types (multi-select)</label>
+      <select id="index-extensions-select" multiple style="width:100%; height:120px; margin-bottom:12px; background:var(--code); border-radius:4px; border:1px solid var(--border); color:var(--text); padding:8px;"></select>
+
+      <div class="btn-row">
+        <button id="rebuild-index-btn" class="action-btn">Rebuild Index</button>
+      </div>
+
+      <pre id="rebuild-index-status" style="margin-top:10px; padding:10px; background:var(--code); border-radius:4px; border:1px solid var(--border); max-height:120px; overflow-y:auto; color:var(--muted); font-size:12px;">Index status...</pre>
+    </div>
   </div>
   <!-- End Settings Tab -->
 
@@ -1270,6 +1289,8 @@
       safeAddListener('pull-model-btn', 'click', pullSelectedModel);
       safeAddListener('save-ollama-config-btn', 'click', saveOllamaConfig);
       safeAddListener('save-project-paths-btn', 'click', saveProjectPaths);
+      safeAddListener('browse-project-dir-btn', 'click', browseProjectDirectoryHandler);
+      safeAddListener('rebuild-index-btn', 'click', rebuildIndex);
 
       // Wizard controls (may be hidden/absent in non-first-run states)
       safeAddListener('wizard-next', 'click', wizardNext);
@@ -1674,6 +1695,68 @@
         statusEl.style.display = 'block';
         statusEl.style.color = 'var(--error)';
         statusEl.textContent = `Failed to save: ${e}`;
+      }
+    }
+
+    // Indexing helpers
+    async function loadExtensionOptions() {
+      try {
+        const groups = await invokeSafe('get_common_file_extensions');
+        const sel = document.getElementById('index-extensions-select');
+        if (!sel || !groups) return;
+        sel.innerHTML = '';
+        groups.forEach(g => {
+          try {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = g.name || g["name"] || '';
+            const exts = g.extensions || g["extensions"] || [];
+            exts.forEach(ext => {
+              const opt = document.createElement('option');
+              opt.value = ext;
+              opt.textContent = ext;
+              optgroup.appendChild(opt);
+            });
+            sel.appendChild(optgroup);
+          } catch (e) {
+            // tolerate malformed entries
+          }
+        });
+      } catch (e) {
+        console.warn('Failed to load extension options:', e);
+      }
+    }
+
+    async function browseProjectDirectoryHandler() {
+      try {
+        const selected = await invokeSafe('browse_project_directory');
+        if (selected) {
+          document.getElementById('index-project-dir').value = selected;
+          toast('Selected: ' + selected);
+        }
+      } catch (e) {
+        console.error('browse project failed', e);
+        toast('Browse failed: ' + (e?.message || e));
+      }
+    }
+
+    async function rebuildIndex() {
+      const dir = (document.getElementById('index-project-dir').value || '').trim();
+      const statusEl = document.getElementById('rebuild-index-status');
+      const sel = document.getElementById('index-extensions-select');
+      if (!dir) {
+        if (statusEl) { statusEl.textContent = 'Please select a directory to index'; statusEl.style.color = 'var(--warning)'; }
+        return;
+      }
+      const exts = sel ? Array.from(sel.selectedOptions).map(o => o.value) : [];
+      if (statusEl) { statusEl.textContent = 'Building index...'; statusEl.style.color = 'var(--muted)'; }
+      try {
+        const res = await invokeSafe('rebuild_document_index', { directory: dir, extensions: exts });
+        if (statusEl) { statusEl.textContent = res; statusEl.style.color = 'var(--success)'; }
+        toast('Index rebuild complete');
+      } catch (e) {
+        console.error('Index rebuild failed', e);
+        if (statusEl) { statusEl.textContent = 'Index rebuild failed: ' + (e?.message || e); statusEl.style.color = 'var(--error)'; }
+        toast('Index rebuild failed');
       }
     }
 
@@ -2088,6 +2171,7 @@
         
         try {
           await loadProjectPaths();
+          try { await loadExtensionOptions(); } catch (e) { console.warn('loadExtensionOptions failed', e); }
         } catch (e) {
           console.warn('Load project paths failed:', e);
         }

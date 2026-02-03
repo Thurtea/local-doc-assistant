@@ -1395,7 +1395,7 @@
                 __ldaDiagnostics.log('wizard', 'start_result', newStatus);
                 
                 if (newStatus.running) {
-                  if (statusEl) statusEl.textContent = '✅ Ollama is ready';
+                  if (statusEl) statusEl.textContent = 'Ollama is ready';
                   if (readyEl) readyEl.style.display = 'block';
                   __wizardState.ollamaReady = true;
                 } else {
@@ -1416,7 +1416,7 @@
           }
           __wizardState.ollamaReady = false;
         } else {
-          if (statusEl) statusEl.textContent = `✅ Ollama ${status.version || ''} is ready`;
+          if (statusEl) statusEl.textContent = `Ollama ${status.version || ''} is ready`;
           if (readyEl) readyEl.style.display = 'block';
           __ldaDiagnostics.log('wizard', 'ollama_ready', { version: status.version });
           __wizardState.ollamaReady = true;
@@ -2086,6 +2086,15 @@
           }
         });
       }
+      
+      __wizardState.step += 1;
+      renderWizardStep();
+    }
+
+    function wizardPrev() {
+      __wizardState.step -= 1;
+      renderWizardStep();
+    }
 
     async function createStagingDir() {
       const input = document.getElementById('wizard-staging-input');

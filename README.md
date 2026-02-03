@@ -159,3 +159,7 @@ Gallery of the latest UI screenshots (captured 2026-02-03):
 ![Setup wizard](docs/screenshots/Screenshot%202026-02-03%20132346.png)
 
 ![Ollama setup](docs/screenshots/Screenshot%202026-02-03%20132351.png)
+
+## Installation
+
+See [INSTALLATION.md](INSTALLATION.md) for platform-specific installers and build instructions (Windows, Linux, macOS). Releases include Windows installers and the GitHub Actions workflow will build and attach Linux/macOS artifacts for tagged releases.

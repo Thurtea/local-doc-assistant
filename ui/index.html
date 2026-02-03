@@ -498,14 +498,17 @@
         <div class="left">
           <button id="wizard-prev" class="action-btn btn-ghost" style="display:none;">Previous</button>
         </div>
+            <button id="browse-project-driver-btn" class="small-btn">Browse</button>
         <div class="right">
           <button id="wizard-skip" class="action-btn btn-ghost">Skip</button>
           <button id="wizard-next" class="action-btn">Next</button>
         </div>
+            <button id="browse-project-library-btn" class="small-btn">Browse</button>
       </div>
     </div>
   </div>
 
+            <button id="browse-another-btn" class="small-btn">Browse</button>
   <div class="tabs-header">
     <button class="tab-btn active" data-tab="assistant">Assistant</button>
     <button class="tab-btn" data-tab="staging">Staging</button>
@@ -2672,6 +2675,39 @@
       } catch (error) {
         toast(`Browse failed: ${error}`);
       }
+    });
+
+    // Settings: Browse buttons for Project Paths (host folder picker)
+    document.getElementById('browse-project-driver-btn')?.addEventListener('click', async () => {
+      try {
+        const selected = await invokeSafe('browse_project_directory');
+        if (selected) {
+          document.getElementById('project-driver-root').value = selected;
+          toast(`Selected: ${selected}`);
+        }
+      } catch (error) {
+        toast(`Browse failed: ${error}`);
+      }
+    });
+
+    document.getElementById('browse-project-library-btn')?.addEventListener('click', async () => {
+      try {
+        const selected = await invokeSafe('browse_project_directory');
+        if (selected) {
+          document.getElementById('project-library-root').value = selected;
+          toast(`Selected: ${selected}`);
+        }
+      } catch (error) {
+        toast(`Browse failed: ${error}`);
+      }
+    });
+
+    // Generic stray browse button (keeps backward compatibility if present)
+    document.getElementById('browse-another-btn')?.addEventListener('click', async () => {
+      try {
+        const selected = await invokeSafe('browse_project_directory');
+        if (selected) toast(`Selected: ${selected}`);
+      } catch (error) { toast(`Browse failed: ${error}`); }
     });
 
     document.getElementById('load-paths-config-btn')?.addEventListener('click', async () => {

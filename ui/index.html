@@ -766,7 +766,12 @@
       <div class="btn-row" style="margin-bottom:16px;">
         <button id="download-ollama-btn" class="action-btn" style="display:none;">Download Ollama</button>
         <button id="start-ollama-btn" class="action-btn">Start Ollama Server</button>
+        <button id="locate-ollama-btn" class="action-btn" style="background:transparent; border:1px solid var(--border); color:var(--muted);">Locate Ollama</button>
         <button id="refresh-ollama-status-btn" class="action-btn" style="background:transparent; border:1px solid var(--border); color:var(--muted);">Refresh Status</button>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+        <input type="checkbox" id="ollama-auto-open" />
+        <label for="ollama-auto-open" style="color:var(--muted); font-size:13px;">Open Ollama download page automatically when missing</label>
       </div>
       
       <label style="display:block; margin-bottom:6px; color:var(--text); font-weight:600;">Model Selection</label>
@@ -790,6 +795,7 @@
       
       <button id="save-ollama-config-btn" class="action-btn">Save Ollama Configuration</button>
       <div id="ollama-config-status" style="margin-top:10px; padding:10px; background:var(--code); border-radius:4px; border:1px solid var(--border); display:none; color:var(--muted); font-size:12px;"></div>
+      <div id="ollama-path-display" style="margin-top:8px; color:var(--muted); font-size:12px;">Ollama path: not configured</div>
     </div>
 
     <div class="card">
@@ -1299,6 +1305,7 @@
       
       // New button event listeners
       safeAddListener('refresh-ollama-status-btn', 'click', checkOllamaStatus);
+      safeAddListener('locate-ollama-btn', 'click', locateOllamaHandler);
       safeAddListener('start-ollama-btn', 'click', startOllamaServer);
       safeAddListener('pull-model-btn', 'click', pullSelectedModel);
       safeAddListener('save-ollama-config-btn', 'click', saveOllamaConfig);
@@ -1347,6 +1354,7 @@
       if (readyEl) readyEl.style.display = 'none';
 
       try {
+        const cfg = await invokeSafe('get_driver_config');
         const status = await invokeSafe('check_ollama_comprehensive');
         __ldaDiagnostics.log('wizard', 'ollama_status_received', status);
 
@@ -1362,6 +1370,13 @@
               window.open('https://ollama.com/download', '_blank');
             });
           }
+          // If user configured auto-open, open the download page automatically
+          try {
+            if (cfg && cfg.ollama_auto_open_download) {
+              __ldaDiagnostics.log('wizard', 'auto_open_download', {});
+              window.open('https://ollama.com/download', '_blank');
+            }
+          } catch (_) {}
           __wizardState.ollamaReady = false;
         } else if (!status.running) {
           const msg = `Ollama ${status.version || ''} installed but not running.`;
@@ -1517,8 +1532,29 @@
           select.value = cfg.ollama_model;
           state.currentModel = cfg.ollama_model;
         }
+        const pathEl = document.getElementById('ollama-path-display');
+        if (pathEl) pathEl.textContent = 'Ollama path: ' + (cfg.ollama_path || 'not configured');
+        const autoEl = document.getElementById('ollama-auto-open');
+        if (autoEl) autoEl.checked = !!cfg.ollama_auto_open_download;
       } catch (e) {
         console.warn('Failed to load Ollama config:', e);
+      }
+    }
+
+    async function locateOllamaHandler() {
+      try {
+        const selected = await invokeSafe('browse_ollama_binary');
+        if (!selected) { toast('No file selected'); return; }
+        const cfg = await invokeSafe('get_driver_config');
+        cfg.ollama_path = selected;
+        await invokeSafe('save_driver_config_cmd', { cfg });
+        const pathEl = document.getElementById('ollama-path-display');
+        if (pathEl) pathEl.textContent = 'Ollama path: ' + selected;
+        toast('Ollama path saved');
+        await checkOllamaStatus();
+      } catch (e) {
+        console.error('Failed to set Ollama path:', e);
+        toast('Failed to set Ollama path');
       }
     }
 
@@ -1664,6 +1700,7 @@
         config.ollama_model = model;
         config.ollama_provider = 'local';
         config.ollama_enabled_tools = []; // Future expansion
+        config.ollama_auto_open_download = !!document.getElementById('ollama-auto-open').checked;
         
         await invokeSafe('save_driver_config_cmd', { cfg: config });
         

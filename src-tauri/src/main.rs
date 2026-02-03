@@ -297,10 +297,11 @@ fn check_ollama_health() -> Result<serde_json::Value, String> {
 fn start_ollama() -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
+        let ollama_exe = load_driver_config().ok().and_then(|c| c.ollama_path).unwrap_or_else(|| "ollama".to_string());
         Command::new("cmd")
-            .args(["/C", "start", "", "cmd", "/K", "ollama", "serve"])
+            .args(["/C", "start", "", "cmd", "/K", &ollama_exe, "serve"])
             .spawn()
-            .map_err(|e| format!("Failed to start Ollama: {}", e))?;
+            .map_err(|e| format!("Failed to start Ollama ({}): {}", ollama_exe, e))?;
         // Give Ollama time to spin up, then retry connectivity a few times
         let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
         for attempt in 0..3 {
@@ -320,10 +321,12 @@ fn start_ollama() -> Result<String, String> {
     
     #[cfg(not(target_os = "windows"))]
     {
+        let ollama_exe = load_driver_config().ok().and_then(|c| c.ollama_path).unwrap_or_else(|| "ollama".to_string());
+        let cmd = format!("\"{}\" serve &", ollama_exe);
         Command::new("sh")
-            .args(&["-c", "ollama serve &"])
+            .args(&["-c", &cmd])
             .spawn()
-            .map_err(|e| format!("Failed to start Ollama: {}", e))?;
+            .map_err(|e| format!("Failed to start Ollama ({}): {}", ollama_exe, e))?;
         let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
         for attempt in 0..3 {
             thread::sleep(Duration::from_secs(2));
@@ -607,8 +610,11 @@ async fn check_ollama_comprehensive() -> Result<OllamaStatus, String> {
         error: None,
     };
 
+    // Determine executable to check (configured path or 'ollama')
+    let ollama_exe = load_driver_config().ok().and_then(|c| c.ollama_path).unwrap_or_else(|| "ollama".to_string());
+
     // Check installation
-    match tokio::process::Command::new("ollama")
+    match tokio::process::Command::new(&ollama_exe)
         .arg("--version")
         .output()
         .await
@@ -620,10 +626,10 @@ async fn check_ollama_comprehensive() -> Result<OllamaStatus, String> {
                 .map(|s| s.trim().to_string());
         }
         Ok(_) => {
-            status.error = Some("Ollama command found but returned error".to_string());
+            status.error = Some(format!("{} found but returned error", ollama_exe));
         }
         Err(e) => {
-            status.error = Some(format!("Ollama not found: {}", e));
+            status.error = Some(format!("Ollama not found (tried '{}'): {}", ollama_exe, e));
             return Ok(status);
         }
     }
@@ -659,18 +665,21 @@ async fn start_ollama_with_verification() -> Result<OllamaStatus, String> {
 
     #[cfg(target_os = "windows")]
     {
+        let ollama_exe = load_driver_config().ok().and_then(|c| c.ollama_path).unwrap_or_else(|| "ollama".to_string());
         tokio::process::Command::new("cmd")
-            .args(["/C", "start", "", "ollama", "serve"])
+            .args(["/C", "start", "", &ollama_exe, "serve"])
             .spawn()
-            .map_err(|e| format!("Failed to spawn Ollama: {}", e))?;
+            .map_err(|e| format!("Failed to spawn Ollama ({}): {}", ollama_exe, e))?;
     }
     
     #[cfg(not(target_os = "windows"))]
     {
+        let ollama_exe = load_driver_config().ok().and_then(|c| c.ollama_path).unwrap_or_else(|| "ollama".to_string());
+        let cmd = format!("\"{}\" serve > /dev/null 2>&1 &", ollama_exe);
         tokio::process::Command::new("sh")
-            .args(&["-c", "ollama serve > /dev/null 2>&1 &"]) 
+            .args(&["-c", &cmd]) 
             .spawn()
-            .map_err(|e| format!("Failed to spawn Ollama: {}", e))?;
+            .map_err(|e| format!("Failed to spawn Ollama ({}): {}", ollama_exe, e))?;
     }
 
     // Progressive retry intervals: 2s, 3s, 5s = 10s total
@@ -692,7 +701,8 @@ async fn start_ollama_with_verification() -> Result<OllamaStatus, String> {
 
 #[tauri::command]
 async fn check_ollama_installed() -> Result<bool, String> {
-    let output = tokio::process::Command::new("ollama")
+    let ollama_exe = load_driver_config().ok().and_then(|c| c.ollama_path).unwrap_or_else(|| "ollama".to_string());
+    let output = tokio::process::Command::new(&ollama_exe)
         .arg("--version")
         .output()
         .await;
@@ -717,20 +727,23 @@ async fn check_ollama_running() -> Result<bool, String> {
 async fn start_ollama_server() -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
+        let ollama_exe = load_driver_config().ok().and_then(|c| c.ollama_path).unwrap_or_else(|| "ollama".to_string());
         tokio::process::Command::new("cmd")
-            .args(["/C", "start", "", "ollama", "serve"])
+            .args(["/C", "start", "", &ollama_exe, "serve"])
             .spawn()
-            .map_err(|e| format!("Failed to start Ollama: {}", e))?;
+            .map_err(|e| format!("Failed to start Ollama ({}): {}", ollama_exe, e))?;
         
         Ok("Ollama server starting...".to_string())
     }
     
     #[cfg(not(target_os = "windows"))]
     {
+        let ollama_exe = load_driver_config().ok().and_then(|c| c.ollama_path).unwrap_or_else(|| "ollama".to_string());
+        let cmd = format!("\"{}\" serve &", ollama_exe);
         tokio::process::Command::new("sh")
-            .args(&["-c", "ollama serve &"])
+            .args(&["-c", &cmd])
             .spawn()
-            .map_err(|e| format!("Failed to start Ollama: {}", e))?;
+            .map_err(|e| format!("Failed to start Ollama ({}): {}", ollama_exe, e))?;
         
         Ok("Ollama server starting...".to_string())
     }
@@ -738,12 +751,13 @@ async fn start_ollama_server() -> Result<String, String> {
 
 #[tauri::command]
 async fn pull_ollama_model(model: String) -> Result<String, String> {
-    let output = tokio::process::Command::new("ollama")
+    let ollama_exe = load_driver_config().ok().and_then(|c| c.ollama_path).unwrap_or_else(|| "ollama".to_string());
+    let output = tokio::process::Command::new(&ollama_exe)
         .arg("pull")
         .arg(&model)
         .output()
         .await
-        .map_err(|e| format!("Failed to pull model: {}", e))?;
+        .map_err(|e| format!("Failed to pull model ({}): {}", ollama_exe, e))?;
     
     if output.status.success() {
         Ok(format!("Successfully pulled model: {}", model))
@@ -814,6 +828,17 @@ fn browse_project_directory() -> Result<Option<String>, String> {
     match rfd::FileDialog::new()
         .set_title("Select Project Directory to Index")
         .pick_folder() 
+    {
+        Some(path) => Ok(Some(path.display().to_string())),
+        None => Ok(None),
+    }
+}
+
+#[tauri::command]
+fn browse_ollama_binary() -> Result<Option<String>, String> {
+    match rfd::FileDialog::new()
+        .set_title("Select Ollama executable")
+        .pick_file()
     {
         Some(path) => Ok(Some(path.display().to_string())),
         None => Ok(None),
@@ -983,6 +1008,7 @@ fn main() {
             test_driver_connection,
             get_driver_config,
             save_driver_config_cmd,
+            browse_ollama_binary,
             validate_and_diagnose_wsl,
             check_ollama_installed,
             check_ollama_running,

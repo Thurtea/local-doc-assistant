@@ -1,0 +1,2515 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LPC MUD Development Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <!-- FIXED: Explicitly load Tauri API before any code tries to use it -->
+  <script type="module">
+    // Verify Tauri is available when page loads
+    if (!window.__TAURI__) {
+      console.warn('Tauri API not yet available, waiting for injection...');
+    } else {
+      console.log('Tauri API already available');
+    }
+
+    // Lightweight runtime error capture (shows errors in UI and stores them in localStorage)
+    // This does NOT depend on Tauri and helps capture renderer console errors when DevTools isn't available.
+    window.__lpc_runtime_errors = window.__lpc_runtime_errors || [];
+
+    function recordRuntimeError(entry) {
+      try {
+        window.__lpc_runtime_errors.push(entry);
+        localStorage.setItem('lpc-runtime-errors', JSON.stringify(window.__lpc_runtime_errors));
+      } catch (_) {}
+      console.error('Captured runtime error (overlay):', entry);
+    }
+
+    window.addEventListener('error', ev => {
+      const msg = ev && ev.message ? `${ev.message} @ ${ev.filename}:${ev.lineno}:${ev.colno}` : String(ev);
+      recordRuntimeError(msg);
+    });
+
+    window.addEventListener('unhandledrejection', ev => {
+      const reason = ev && ev.reason ? (ev.reason.message || String(ev.reason)) : String(ev);
+      recordRuntimeError('UnhandledRejection: ' + reason);
+    });
+
+    // Inject a small errors panel when DOM is ready so you can see messages without DevTools
+    document.addEventListener('DOMContentLoaded', () => {
+      try {
+        const existing = document.getElementById('lpc-runtime-errors-panel');
+        if (existing) return;
+        const panel = document.createElement('div');
+        panel.id = 'lpc-runtime-errors-panel';
+        panel.style.position = 'fixed';
+        panel.style.right = '12px';
+        panel.style.bottom = '12px';
+        panel.style.maxWidth = '38vw';
+        panel.style.maxHeight = '30vh';
+        panel.style.overflow = 'auto';
+        panel.style.background = 'rgba(16,16,16,0.95)';
+        panel.style.color = '#f87171';
+        panel.style.border = '1px solid rgba(248,113,113,0.25)';
+        panel.style.padding = '8px';
+        panel.style.fontSize = '12px';
+        panel.style.zIndex = '99999';
+        panel.style.display = 'none';
+        panel.title = 'Runtime errors (click to hide)';
+        panel.addEventListener('click', () => { panel.style.display = panel.style.display === 'none' ? 'block' : 'none'; });
+
+        const stored = localStorage.getItem('lpc-runtime-errors');
+        if (stored) {
+          try {
+            const arr = JSON.parse(stored) || [];
+            if (arr.length) {
+              panel.textContent = arr.join('\n\n');
+              panel.style.display = 'block';
+            }
+          } catch (_) {}
+        }
+
+        document.body && document.body.appendChild(panel);
+      } catch (_) {}
+    });
+  </script>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --panel-2: #1c2128;
+      --text: #c9d1d9;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-2: #1f6feb;
+      --border: #30363d;
+      --shadow: 0 12px 40px rgba(0,0,0,0.4);
+      --success: #3fb950;
+      --warning: #d29922;
+      --error: #f85149;
+      --code: #0d1117;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Sora", "SF Pro Display", "Inter", sans-serif;
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 28px;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(13,17,23,0.95);
+    }
+
+    .title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pill {
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .select, .input, textarea {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 160px;
+      resize: vertical;
+      font-family: "JetBrains Mono", "Consolas", monospace;
+      background: var(--panel-2);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 18px;
+      padding: 18px 24px 32px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .section-title > span:first-child {
+      flex: 1;
+    }
+
+    .subgrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+    }
+
+    .control {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    label span {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    input[type="range"] {
+      flex: 1;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.1s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+
+    button.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border: none; color: #0b1016; }
+    button:hover { transform: translateY(-1px); border-color: var(--accent); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    .response {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      min-height: 260px;
+      max-height: 600px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      clear: both;
+    }
+
+    .markdown-body {
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text);
+    }
+
+    .markdown-body pre { background: var(--code); padding: 12px; border-radius: 10px; overflow-x: auto; }
+    .markdown-body code { background: rgba(255,255,255,0.04); padding: 2px 4px; border-radius: 6px; }
+
+    .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    .chip { background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; color: var(--muted); font-size: 12px; }
+
+    .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 6px; }
+    .metric-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.03); }
+    .metric-title { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+    .metric-value { font-size: 18px; font-weight: 700; margin-top: 6px; display: flex; align-items: baseline; gap: 6px; }
+    .metric-sub { font-size: 12px; color: var(--muted); }
+    .score-pill { display: inline-flex; align-items: center; gap: 8px; padding: 10px 12px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #0b1016; border-radius: 12px; font-weight: 700; box-shadow: var(--shadow); }
+    .issue-list { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; }
+    .issue-item { padding: 10px 12px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); }
+    .issue-item.bad { border-color: var(--error); color: #fecdd3; }
+    .issue-item.good { border-color: var(--success); color: #d1fae5; }
+    .badge { padding: 4px 8px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border); background: var(--panel); color: var(--muted); }
+    .badge.ok { border-color: var(--success); color: var(--success); }
+    .badge.warn { border-color: var(--warning); color: var(--warning); }
+    .badge.err { border-color: var(--error); color: var(--error); }
+
+    .source-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .source-item { padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-2); }
+    .source-score { color: var(--accent); font-weight: 700; font-size: 12px; }
+
+    .status { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warning); box-shadow: 0 0 0 4px rgba(251,191,36,0.12); }
+    .dot.ok { background: var(--success); box-shadow: 0 0 0 4px rgba(52,211,153,0.12); }
+    .dot.err { background: var(--error); box-shadow: 0 0 0 4px rgba(248,113,113,0.12); }
+
+    .toolbar { display: flex; align-items: center; gap: 10px; }
+    .tag { font-size: 12px; color: var(--muted); }
+
+    .copy-btn {
+      float: right;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 4px 8px;
+      border-radius: 8px;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .prompt-container {
+      position: relative;
+    }
+
+    .copy-prompt-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      cursor: pointer;
+      z-index: 5;
+      transition: all 0.2s ease;
+    }
+
+    .copy-prompt-btn:hover {
+      background: var(--panel-2);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+      border-radius: 10px;
+      color: var(--text);
+      box-shadow: var(--shadow);
+      display: none;
+    }
+
+    @media (max-width: 1100px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    /* Tab styling */
+    .tabs-header {
+      display: flex;
+      gap: 8px;
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(15,20,26,0.95);
+      overflow-x: auto;
+      scroll-behavior: smooth;
+    }
+
+    .tab-btn {
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--muted);
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border: none;
+      color: #0b1016;
+    }
+
+    .tab-content {
+      display: none;
+      padding: 18px 24px;
+      min-height: 500px;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .tab-content .card {
+      margin-bottom: 18px;
+    }
+
+    /* Setup wizard modal */
+    .wizard-overlay {
+      position: fixed;
+      left: 0;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 999999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .wizard-modal {
+      width: 820px;
+      max-width: 95%;
+      background: linear-gradient(180deg, #0f1724, #0b1220);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 12px;
+      padding: 18px;
+      color: var(--text);
+      box-shadow: 0 24px 60px rgba(2,6,23,0.7);
+    }
+
+    .wizard-steps { display: flex; gap: 8px; margin-bottom: 12px; }
+    .wizard-step { flex: 1; padding: 8px 10px; background: var(--panel-2); border-radius: 8px; text-align:center; font-weight:600; }
+    .wizard-step.active { background: linear-gradient(135deg,var(--accent),var(--accent-2)); color: #0b1016; }
+    .wizard-body { min-height: 160px; margin-bottom: 12px; }
+    .wizard-actions { display:flex; justify-content: space-between; gap: 8px; }
+    .wizard-actions .left { display:flex; gap:8px; }
+    .wizard-input { width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--panel); color:var(--text); }
+
+    .action-btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border: none;
+      color: #0b1016;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+
+    .btn-ghost {
+      background: transparent !important;
+      border: 1px solid var(--border);
+      color: var(--muted) !important;
+      padding: 8px 12px;
+    }
+
+    .action-btn:hover {
+      transform: translateY(-2px);
+    }
+
+    .action-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- First-run Setup Wizard Modal (single instance) removed duplicate markup; the canonical modal below is used -->
+  <header>
+    <div class="title">
+      <div>
+        <div>LPC Dev Assistant</div>
+      </div>
+    </div>
+      <div class="controls">
+      <div class="status" id="conn-status"><span class="dot"></span><span id="status-text">Connecting...</span></div>
+      <span class="pill">Model: qwen2.5-coder:7b</span>
+    </div>
+  </header>
+
+  <!-- First-run Setup Wizard Modal (hidden by default) -->
+  <div id="setup-wizard-overlay" class="wizard-overlay" role="dialog" aria-modal="true">
+    <div class="wizard-modal" id="setup-wizard">
+      <div class="wizard-steps">
+        <div class="wizard-step" data-step="1">1. Ollama</div>
+        <div class="wizard-step" data-step="2">2. Staging</div>
+        <div class="wizard-step" data-step="3">3. WSL</div>
+        <div class="wizard-step" data-step="4">4. Done</div>
+      </div>
+      <div class="wizard-body" id="wizard-body">
+        <!-- Step content injected by JS -->
+      </div>
+      <div class="wizard-actions">
+        <div class="left">
+          <button id="wizard-prev" class="action-btn btn-ghost" style="display:none;">Previous</button>
+        </div>
+        <div class="right">
+          <button id="wizard-skip" class="action-btn btn-ghost">Skip</button>
+          <button id="wizard-next" class="action-btn">Next</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs-header">
+    <button class="tab-btn active" data-tab="assistant">Assistant</button>
+    <button class="tab-btn" data-tab="staging">Staging</button>
+    <button class="tab-btn" data-tab="settings">Settings</button>
+  </div>
+
+  <!-- Assistant Tab (Main content) -->
+  <div id="assistant" class="tab-content active">
+    <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 18px; padding: 18px 24px; height: calc(100vh - 160px);">
+      <div class="card" style="display: flex; flex-direction: column;">
+        <div class="section-title">
+          <span>Prompt</span>
+        </div>
+        <textarea id="question" placeholder="Ask about driver, efuns, mudlib patterns, or paste code for guidance..." style="flex: 1; resize: none; min-height: 200px;"></textarea>
+        <div class="btn-row" style="margin-top:12px;">
+          <button class="primary" id="ask-btn">Ask</button>
+          <button id="stop-btn">Stop</button>
+          <button id="clear-btn">Clear</button>
+        </div>
+        <!-- Hidden inputs for settings - keep defaults -->
+        <input type="range" id="temperature" min="0" max="1" step="0.05" value="0.3" style="display:none;">
+        <input type="range" id="top-p" min="0" max="1" step="0.05" value="0.9" style="display:none;">
+        <input type="range" id="top-k" min="1" max="200" step="1" value="40" style="display:none;">
+        <input type="range" id="num-predict" min="256" max="8192" step="256" value="4096" style="display:none;">
+        <textarea id="system-prompt" style="display:none;"></textarea>
+        <input type="checkbox" id="rag-toggle" checked style="display:none;" />
+        <small id="temp-val" style="display:none;">0.3</small>
+        <small id="top-p-val" style="display:none;">0.9</small>
+        <small id="top-k-val" style="display:none;">40</small>
+        <small id="num-predict-val" style="display:none;">4096</small>
+      </div>
+
+      <div class="card" style="display: flex; flex-direction: column;">
+        <div class="section-title">
+          <span>Response</span>
+          <div class="btn-row">
+            <button id="copy-response">Copy</button>
+            <button id="copy-to-driver">To Driver</button>
+            <button id="copy-to-library">To Library</button>
+          </div>
+        </div>
+        <div class="response" style="flex: 1; overflow-y: auto;">
+          <div id="response-markdown" class="markdown-body">Waiting for a prompt.</div>
+        </div>
+        <!-- Hidden elements for compatibility -->
+        <div id="meta-row" style="display:none;">
+          <span class="chip" id="meta-model">Model: qwen2.5-coder:7b</span>
+          <span class="chip" id="meta-latency">Latency: -</span>
+        </div>
+        <span id="header-badge" style="display:none;"></span>
+        <div id="header-status" style="display:none;"></div>
+        <span id="opcode-count" style="display:none;">0</span>
+        <div id="opcode-meta" style="display:none;"></div>
+        <span id="quality-score" style="display:none;">-</span>
+        <div id="quality-meta" style="display:none;"></div>
+        <ul id="issue-list" style="display:none;"></ul>
+        <div id="score-pill" style="display:none;">Score: --</div>
+        <div id="scoring-note" style="display:none;"></div>
+        <ul id="context-list" style="display:none;"></ul>
+        <div id="status-bar" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+  <!-- End Assistant Tab -->
+
+  <!-- Driver Tab -->
+  <div id="driver" class="tab-content">
+    <div class="card">
+      <h3 style="margin-top: 0;">AMLP Driver Integration</h3>
+      <p style="color: var(--muted); font-size: 14px;">Test WSL command execution and LPC file compilation.</p>
+      <p style="color: var(--muted); font-size: 13px; margin-top: 8px; line-height: 1.6;">
+        <strong>Note:</strong> This feature requires Windows Subsystem for Linux (WSL) and an AMLP driver.<br>
+        If you don't have WSL setup, click the Settings tab above for a step-by-step guide.
+      </p>
+      <div id="driver-warning" style="display:none; margin-top:12px; padding:12px; border-radius:8px; border:1px solid var(--warning); background:rgba(251,191,36,0.1); color: var(--warning);">
+        <strong>WSL Setup Required</strong><br>
+        <span style="font-size: 13px;">The driver integration is not configured. Go to Settings tab for setup instructions, or click below:</span>
+        <button id="open-settings-btn" class="action-btn" style="margin-top:8px; background:transparent; color: var(--warning); border-color: var(--warning);">Open Setup Guide</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Connection Test</h3>
+      <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">Verify that the driver is accessible via WSL</p>
+      <button id="test-connection-btn" class="action-btn">Test Driver Connection</button>
+      <pre id="connection-status" style="margin-top: 10px; padding: 10px; background: var(--code); border-radius: 4px; border: 1px solid var(--border); max-height: 200px; overflow-y: auto; color: var(--muted); font-size: 12px;">Ready to test...</pre>
+    </div>
+
+    <div class="card">
+      <h3>Compile LPC File</h3>
+      <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">Compile an LPC file using the amlp-driver</p>
+      <label style="display: block; margin-bottom: 6px; color: var(--text); font-weight: 600;">File Path (WSL):</label>
+      <input type="text" id="lpc-file-path" placeholder="/home/thurtea/amlp-library/master.c" style="width: 100%; margin-bottom: 12px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 13px;">
+      <button id="compile-btn" class="action-btn">Compile File</button>
+      <pre id="compile-output" style="margin-top: 10px; padding: 10px; background: var(--code); border-radius: 4px; border: 1px solid var(--border); max-height: 300px; overflow-y: auto; color: var(--muted); font-size: 12px;">Ready to compile...</pre>
+    </div>
+
+    <div class="card">
+      <h3>Run LPC File</h3>
+      <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">Run an LPC file using the amlp-driver (compile and execute)</p>
+      <label style="display: block; margin-bottom: 6px; color: var(--text); font-weight: 600;">File Path (WSL):</label>
+      <input type="text" id="lpc-run-file-path" placeholder="/home/thurtea/amlp-driver/tests/lpc/simple.c" style="width: 100%; margin-bottom: 12px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 13px;">
+      <button id="run-btn" class="action-btn">Run File</button>
+      <pre id="run-output" style="margin-top: 10px; padding: 10px; background: var(--code); border-radius: 4px; border: 1px solid var(--border); max-height: 300px; overflow-y: auto; color: var(--muted); font-size: 12px;">Ready to run...</pre>
+    </div>
+
+    <div class="card">
+      <h3>Build Driver UI</h3>
+      <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">Run the styled terminal UI build system</p>
+      <button id="build-ui-btn" class="action-btn">Run make build-ui</button>
+      <pre id="build-output" style="margin-top: 10px; padding: 10px; background: var(--code); border-radius: 4px; border: 1px solid var(--border); max-height: 400px; overflow-y: auto; color: var(--muted); font-size: 12px;">Ready to build...</pre>
+    </div>
+  </div>
+  <!-- End Driver Tab -->
+
+  <!-- Generated Code Tab -->
+  <div id="generated" class="tab-content">
+    <div class="card">
+      <h3 style="margin-top: 0;">Driver Code Output</h3>
+      <p style="color: var(--muted); font-size: 14px; margin-bottom: 12px;">Save generated driver code to your WSL driver directory.</p>
+      
+      <label style="display: block; margin-bottom: 6px; color: var(--text); font-weight: 600;">Filename:</label>
+      <input type="text" id="driver-filename" placeholder="efun_socket.c" style="width: 100%; margin-bottom: 12px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 13px;">
+      
+      <label style="display: block; margin-bottom: 6px; color: var(--text); font-weight: 600;">Code:</label>
+      <textarea id="driver-output" placeholder="Your generated driver code will appear here, or paste code to save..." style="width: 100%; min-height: 300px; margin-bottom: 12px; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-family: 'JetBrains Mono', monospace; font-size: 13px; resize: vertical;"></textarea>
+      
+      <div class="btn-row">
+        <button id="save-to-driver-btn" class="action-btn">Save to Driver</button>
+        <button id="browse-driver-btn" class="action-btn" style="background: transparent; border: 1px solid var(--border); color: var(--muted);">Browse Directory</button>
+      </div>
+      
+      <div id="driver-save-status" style="margin-top: 10px; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-2); color: var(--muted); font-size: 13px; display: none;"></div>
+    </div>
+
+    <div class="card">
+      <h3>Library Code Output</h3>
+      <p style="color: var(--muted); font-size: 14px; margin-bottom: 12px;">Save generated mudlib/library code to your WSL library directory.</p>
+      
+      <label style="display: block; margin-bottom: 6px; color: var(--text); font-weight: 600;">Filename:</label>
+      <input type="text" id="library-filename" placeholder="lib_combat.c" style="width: 100%; margin-bottom: 12px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 13px;">
+      
+      <label style="display: block; margin-bottom: 6px; color: var(--text); font-weight: 600;">Code:</label>
+      <textarea id="library-output" placeholder="Your generated library code will appear here, or paste code to save..." style="width: 100%; min-height: 300px; margin-bottom: 12px; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-family: 'JetBrains Mono', monospace; font-size: 13px; resize: vertical;"></textarea>
+      
+      <div class="btn-row">
+        <button id="save-to-library-btn" class="action-btn">Save to Library</button>
+        <button id="browse-library-btn" class="action-btn" style="background: transparent; border: 1px solid var(--border); color: var(--muted);">Browse Directory</button>
+      </div>
+      
+      <div id="library-save-status" style="margin-top: 10px; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-2); color: var(--muted); font-size: 13px; display: none;"></div>
+    </div>
+
+    <div class="card">
+      <h3>Configuration</h3>
+      <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">Set your default output directories for driver and library code. These paths should be WSL Linux paths.</p>
+      
+      <label style="display: block; margin-bottom: 6px; color: var(--text); font-weight: 600;">Driver Output Path (WSL):</label>
+      <input type="text" id="driver-output-path" placeholder="/home/thurtea/amlp-driver/src" style="width: 100%; margin-bottom: 12px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 13px;">
+      
+      <label style="display: block; margin-bottom: 6px; color: var(--text); font-weight: 600;">Library Output Path (WSL):</label>
+      <input type="text" id="library-output-path" placeholder="/home/thurtea/amlp-library/std" style="width: 100%; margin-bottom: 12px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 13px;">
+      
+      <div class="btn-row">
+        <button id="load-paths-config-btn" class="action-btn">Load Config</button>
+        <button id="save-paths-config-btn" class="action-btn">Save Config</button>
+      </div>
+      
+      <div id="paths-config-status" style="margin-top: 10px; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-2); color: var(--muted); font-size: 13px; display: none;"></div>
+    </div>
+  </div>
+  <!-- End Generated Code Tab -->
+
+  <!-- Settings Tab -->
+  <div id="settings" class="tab-content">
+    <div class="card" style="background: linear-gradient(135deg, rgba(59,130,246,0.05) 0%, rgba(147,51,234,0.05) 100%); border: 1px solid var(--accent);">
+      <h3 style="margin-top: 0; color: var(--accent);">WSL Setup Required (Optional)</h3>
+      <p style="color: var(--text); font-size: 14px; line-height: 1.6; margin-bottom: 12px;">
+        <strong>What is this?</strong> The Driver Integration feature lets you compile and test LPC code using a local AMLP driver running in Windows Subsystem for Linux (WSL).
+      </p>
+      <p style="color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 12px;">
+        <strong>Do I need this?</strong> No! The AI assistant works perfectly without WSL. This is only needed if you want to compile/run LPC code directly from the app.
+      </p>
+      <details style="margin-bottom: 16px; background: var(--panel); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+        <summary style="cursor: pointer; font-weight: 600; color: var(--accent);">Quick Setup Guide (Click to expand)</summary>
+        <div style="margin-top: 12px; color: var(--muted); font-size: 13px; line-height: 1.7;">
+          <p><strong>Step 1:</strong> Install WSL (if not already installed)</p>
+          <pre style="background: var(--code); padding: 8px; border-radius: 4px; margin: 8px 0;">wsl --install</pre>
+          <p style="margin-top: 8px;">Reboot Windows, then verify WSL is working:</p>
+          <pre style="background: var(--code); padding: 8px; border-radius: 4px; margin: 8px 0;">wsl --status</pre>
+          
+          <p style="margin-top: 12px;"><strong>Step 2:</strong> Find your WSL username</p>
+          <pre style="background: var(--code); padding: 8px; border-radius: 4px; margin: 8px 0;">wsl whoami</pre>
+          <p style="margin-top: 4px; font-size: 12px;">(This shows your Linux username, e.g., "thurtea" or "john")</p>
+          
+          <p style="margin-top: 12px;"><strong>Step 3:</strong> Create directories for the driver</p>
+          <pre style="background: var(--code); padding: 8px; border-radius: 4px; margin: 8px 0;">wsl mkdir -p ~/amlp-driver ~/amlp-library</pre>
+          
+          <p style="margin-top: 12px;"><strong>Step 4:</strong> Enter your settings below</p>
+          <ul style="margin: 8px 0; padding-left: 20px;">
+            <li>WSL Username: Your Linux username from Step 2</li>
+            <li>Driver Root: <code>/home/YOUR_USERNAME/amlp-driver</code></li>
+            <li>Library Root: <code>/home/YOUR_USERNAME/amlp-library</code></li>
+          </ul>
+          
+          <p style="margin-top: 12px;"><strong>Step 5:</strong> Install/build your AMLP driver</p>
+          <p style="font-size: 12px;">Copy your driver source to the WSL directory and build it following your driver's build instructions.</p>
+          
+          <p style="margin-top: 12px;"><strong>Step 6:</strong> Click "Run Validation" below to verify everything works!</p>
+        </div>
+      </details>
+    </div>
+    
+    <div class="card">
+      <h3>WSL Configuration</h3>
+      <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">Enter your WSL paths. Click the guide above if you need help.</p>
+      <label style="display:block; margin-bottom:6px; color:var(--text); font-weight:600;">WSL Username <span style="color:var(--muted); font-weight:400; font-size:12px;">(run: wsl whoami)</span></label>
+      <input type="text" id="wsl-username" placeholder="thurtea" style="width:100%; margin-bottom:8px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px;">
+      <label style="display:block; margin-bottom:6px; color:var(--text); font-weight:600;">Driver Root (WSL) <span style="color:var(--muted); font-weight:400; font-size:12px;">(Linux path to driver directory)</span></label>
+      <input type="text" id="wsl-driver-root" placeholder="/home/thurtea/amlp-driver" style="width:100%; margin-bottom:8px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px;">
+      <label style="display:block; margin-bottom:6px; color:var(--text); font-weight:600;">Library Root (WSL) <span style="color:var(--muted); font-weight:400; font-size:12px;">(Linux path to mudlib files)</span></label>
+      <input type="text" id="wsl-library-root" placeholder="/home/thurtea/amlp-library" style="width:100%; margin-bottom:12px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px;">
+      <div class="btn-row">
+        <button id="load-config-btn" class="action-btn">Load Config</button>
+        <button id="save-config-btn" class="action-btn">Save Settings</button>
+        <button id="test-paths-btn" class="action-btn">Test Paths</button>
+      </div>
+      <pre id="settings-output" style="margin-top:10px; padding:10px; background:var(--code); border-radius:4px; border:1px solid var(--border); max-height:200px; overflow-y:auto; color:var(--muted); font-size:12px;">Settings status...</pre>
+    </div>
+
+    <div class="card">
+      <h3>WSL Validation</h3>
+      <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">Click "Run Validation" to check if WSL and your driver are properly configured. If validation fails, use the copy buttons to get the fix commands.</p>
+      <div id="wsl-status-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
+        <div class="status" id="status-wsl">WSL: pending</div>
+        <div class="status" id="status-driver-dir">Driver directory: pending</div>
+        <div class="status" id="status-driver-bin">Driver binary: pending</div>
+        <div class="status" id="status-library-dir">Library directory: pending</div>
+      </div>
+      <div class="btn-row">
+        <button id="run-validation-btn" class="action-btn">Run Validation</button>
+        <button id="copy-fix-driver-dir" class="action-btn" data-target="driver-dir" style="background:transparent; color: var(--muted); border:1px solid var(--border);">Copy driver dir fix</button>
+        <button id="copy-fix-driver-bin" class="action-btn" data-target="driver-bin" style="background:transparent; color: var(--muted); border:1px solid var(--border);">Copy driver build cmd</button>
+        <button id="copy-fix-library-dir" class="action-btn" data-target="library-dir" style="background:transparent; color: var(--muted); border:1px solid var(--border);">Copy library dir fix</button>
+      </div>
+      <pre id="validation-output" style="margin-top:10px; padding:10px; background:var(--code); border-radius:4px; border:1px solid var(--border); max-height:220px; overflow-y:auto; color:var(--muted); font-size:12px;">Validation not run yet.</pre>
+    </div>
+
+    <div class="card">
+      <h3>Ollama Setup</h3>
+      <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">Configure Ollama for AI code generation.</p>
+      
+      <div id="ollama-status-indicators" style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
+        <div class="status" id="ollama-installed-status"><span class="dot"></span><span>Checking Ollama installation...</span></div>
+        <div class="status" id="ollama-running-status"><span class="dot"></span><span>Checking Ollama server...</span></div>
+      </div>
+      
+      <div class="btn-row" style="margin-bottom:16px;">
+        <button id="download-ollama-btn" class="action-btn" style="display:none;">Download Ollama</button>
+        <button id="start-ollama-btn" class="action-btn">Start Ollama Server</button>
+        <button id="refresh-ollama-status-btn" class="action-btn" style="background:transparent; border:1px solid var(--border); color:var(--muted);">Refresh Status</button>
+      </div>
+      
+      <label style="display:block; margin-bottom:6px; color:var(--text); font-weight:600;">Model Selection</label>
+      <select id="ollama-model-select" style="width:100%; margin-bottom:8px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px;">
+        <option value="qwen2.5-coder:7b">qwen2.5-coder:7b (Current)</option>
+        <option value="glm-4.7-flash">glm-4.7-flash (New)</option>
+        <option value="glm-4.7:cloud">glm-4.7:cloud (Cloud)</option>
+      </select>
+      
+      <button id="pull-model-btn" class="action-btn" style="margin-bottom:16px;">Pull Selected Model</button>
+      
+      <label style="display:block; margin-bottom:6px; color:var(--text); font-weight:600;">Installed Models</label>
+      <div id="installed-models-list" style="padding:10px; background:var(--code); border-radius:4px; border:1px solid var(--border); min-height:60px; max-height:150px; overflow-y:auto; margin-bottom:16px;">
+        <span style="color:var(--muted); font-size:12px;">Loading models...</span>
+      </div>
+      
+      <label style="display:block; margin-bottom:6px; color:var(--text); font-weight:600;">Optional Tools (Future)</label>
+      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
+        </div>
+      <!-- REMOVED: Optional Tools section with Coming Soon placeholders (was unused) -->
+      
+      <button id="save-ollama-config-btn" class="action-btn">Save Ollama Configuration</button>
+      <div id="ollama-config-status" style="margin-top:10px; padding:10px; background:var(--code); border-radius:4px; border:1px solid var(--border); display:none; color:var(--muted); font-size:12px;"></div>
+    </div>
+
+    <div class="card">
+      <h3>Project Paths</h3>
+      <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">Configure paths to your AMLP Driver and Library projects.</p>
+      
+      <label style="display:block; margin-bottom:6px; color:var(--text); font-weight:600;">AMLP Driver Root (WSL)</label>
+      <input type="text" id="project-driver-root" placeholder="/home/thurtea/amlp-driver" style="width:100%; margin-bottom:8px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px;">
+      <button id="test-driver-path-btn" class="action-btn" style="background:transparent; border:1px solid var(--border); color:var(--muted); margin-bottom:16px;">Test Driver Path</button>
+      
+      <label style="display:block; margin-bottom:6px; color:var(--text); font-weight:600;">AMLP Library Root (WSL)</label>
+      <input type="text" id="project-library-root" placeholder="/home/thurtea/amlp-library" style="width:100%; margin-bottom:8px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px;">
+      <button id="test-library-path-btn" class="action-btn" style="background:transparent; border:1px solid var(--border); color:var(--muted); margin-bottom:16px;">Test Library Path</button>
+      
+      <label style="display:block; margin-bottom:6px; color:var(--text); font-weight:600;">Staging Directory (Read-only)</label>
+      <input type="text" id="staging-directory-display" placeholder="Not configured" readonly style="width:100%; margin-bottom:16px; background: var(--panel-2); color: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 10px; cursor: not-allowed;">
+      
+      <button id="save-project-paths-btn" class="action-btn">Save Project Paths</button>
+      <div id="project-paths-status" style="margin-top:10px; padding:10px; background:var(--code); border-radius:4px; border:1px solid var(--border); display:none; color:var(--muted); font-size:12px;"></div>
+    </div>
+  </div>
+  <!-- End Settings Tab -->
+
+  <!-- Staging Tab -->
+  <div id="staging" class="tab-content">
+    <div class="card">
+      <div class="section-title">
+        <span>Staged Files</span>
+        <div class="btn-row">
+          <button id="refresh-staging-btn" class="action-btn" style="background:transparent; border:1px solid var(--border); color:var(--muted);">Refresh</button>
+          <button id="clear-all-staging-btn" class="action-btn" style="background:transparent; border:1px solid var(--border); color:var(--warning);">Clear All</button>
+        </div>
+      </div>
+      <p style="color: var(--muted); font-size: 13px; margin-bottom: 16px;">
+        Review generated code before copying to your AMLP projects. Files are saved here first, then you can verify and copy them individually.
+      </p>
+      
+      <div id="staged-files-container" style="display:flex; flex-direction:column; gap:12px;">
+        <div style="padding:20px; text-align:center; color:var(--muted);">
+          No staged files yet. Generate code in the Assistant tab to get started.
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- End Staging Tab -->
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const store = (() => {
+      try { return window.localStorage; } catch { return null; }
+    })();
+
+    // Required model for LPC Development Assistant
+    const REQUIRED_MODEL = 'qwen2.5-coder:7b';
+
+    const state = {
+      currentModel: REQUIRED_MODEL,
+      loading: false,
+      cancelToken: 0,
+      lastMetrics: null,
+      wslReady: false,
+      wslDiag: null,
+    };
+
+    const wslFixes = {
+      driverDir: null,
+      driverBin: null,
+      libraryDir: null,
+    };
+
+    const settingsDefaults = {
+      temperature: 0.3,
+      top_p: 0.9,
+      top_k: 40,
+      num_predict: 4096,
+      rag: true,
+      system_prompt: ''
+    };
+
+    const emptyMetrics = {
+      headerCompliance: false,
+      opcodeCount: 0,
+      issues: [],
+      score: null,
+      callMethodUse: false,
+      hasCodegenEmit: false,
+    };
+
+    function analyzeResponse(answer) {
+      const text = answer || '';
+      const codeFenceCount = (text.match(/```/g) || []).length / 2;
+      const hasFence = codeFenceCount >= 1;
+      const lengthOk = text.trim().length >= 200;
+      const hasInclude = /#include\s+[<"]/i.test(text);
+      const hasFunction = /\b(void|int|static|char|struct)\s+[A-Za-z_][A-Za-z0-9_]*\s*\(/.test(text);
+      const qualitySignals = ["struct", "switch", "return", "efun", "object", "call_other", "CALL_METHOD", "apply", "opcode", "emit"]; 
+      const signalCount = qualitySignals.reduce((acc, sig) => acc + (text.includes(sig) ? 1 : 0), 0);
+
+      const issues = [];
+      if (!lengthOk) issues.push("Response too short (<200 chars)");
+      if (!hasFence) issues.push("No code block detected");
+      if (!hasFunction) issues.push("No function signatures detected");
+      if (!hasInclude) issues.push("No includes or headers referenced");
+
+      const base = 10 - issues.length * 1.5;
+      const bonus = (hasFence ? 0.6 : 0) + (hasInclude ? 0.4 : 0) + (hasFunction ? 0.6 : 0) + Math.min(signalCount, 8) * 0.25;
+      const score = Math.max(0, Math.min(10, base + bonus));
+
+      return {
+        headerCompliance: issues.length === 0,
+        opcodeCount: signalCount,
+        issues,
+        score: Number(score.toFixed(1)),
+        callMethodUse: hasFunction,
+        hasCodegenEmit: hasFence,
+      };
+    }
+
+    function renderValidation(metrics = emptyMetrics) {
+      const headerBadge = document.getElementById('header-badge');
+      const headerStatus = document.getElementById('header-status');
+      const opcodeCount = document.getElementById('opcode-count');
+      const opcodeMeta = document.getElementById('opcode-meta');
+      const qualityScore = document.getElementById('quality-score');
+      const qualityMeta = document.getElementById('quality-meta');
+      const issueList = document.getElementById('issue-list');
+      if (!headerBadge || !headerStatus || !opcodeCount || !issueList) return;
+
+      headerBadge.textContent = metrics.headerCompliance ? 'Ready' : 'Needs review';
+      headerBadge.className = `badge ${metrics.headerCompliance ? 'ok' : 'err'}`;
+      headerStatus.textContent = metrics.headerCompliance ? 'Structure looks valid' : 'Add code fences and functions';
+      opcodeCount.textContent = metrics.opcodeCount;
+      opcodeMeta.textContent = metrics.callMethodUse ? 'Functions detected' : 'Add function definitions';
+      qualityScore.textContent = (typeof metrics.score === 'number') ? metrics.score.toFixed(1) : '--';
+      qualityMeta.textContent = metrics.headerCompliance ? 'Validated' : 'Pending fixes';
+
+      issueList.innerHTML = '';
+      if (!metrics.issues || metrics.issues.length === 0) {
+        issueList.innerHTML = '<li class="issue-item good">No validation issues detected.</li>';
+      } else {
+        metrics.issues.forEach(issue => {
+          const li = document.createElement('li');
+          li.className = 'issue-item bad';
+          li.textContent = issue;
+          issueList.appendChild(li);
+        });
+      }
+    }
+
+    function renderScorePill(metrics = emptyMetrics) {
+      const pill = document.getElementById('score-pill');
+      const note = document.getElementById('scoring-note');
+      if (!pill || !note) return;
+      pill.textContent = `Score: ${(typeof metrics.score === 'number') ? metrics.score.toFixed(1) : '--'}/10`;
+      note.textContent = `${metrics.opcodeCount} signals - ${metrics.headerCompliance ? 'Looks good' : 'Needs attention'}`;
+    }
+
+    function persistSettings() {
+      if (!store) return;
+      const payload = {
+        temperature: parseFloat(document.getElementById('temperature').value),
+        top_p: parseFloat(document.getElementById('top-p').value),
+        top_k: parseInt(document.getElementById('top-k').value, 10),
+        num_predict: parseInt(document.getElementById('num-predict').value, 10),
+        rag: document.getElementById('rag-toggle').checked,
+        system_prompt: document.getElementById('system-prompt').value || ''
+      };
+      store.setItem('lpc-settings', JSON.stringify(payload));
+    }
+
+    function loadSettings() {
+      const raw = store?.getItem('lpc-settings');
+      const data = raw ? { ...settingsDefaults, ...JSON.parse(raw) } : settingsDefaults;
+      document.getElementById('temperature').value = data.temperature;
+      document.getElementById('top-p').value = data.top_p;
+      document.getElementById('top-k').value = data.top_k;
+      document.getElementById('num-predict').value = data.num_predict;
+      document.getElementById('rag-toggle').checked = data.rag;
+      document.getElementById('system-prompt').value = data.system_prompt;
+      updateSliderLabels();
+    }
+
+    function updateSliderLabels() {
+      document.getElementById('temp-val').textContent = document.getElementById('temperature').value;
+      document.getElementById('top-p-val').textContent = document.getElementById('top-p').value;
+      document.getElementById('top-k-val').textContent = document.getElementById('top-k').value;
+      document.getElementById('num-predict-val').textContent = document.getElementById('num-predict').value;
+    }
+
+    function setStatus(text, kind = 'info') {
+      const el = document.getElementById('status-bar');
+      const status = document.getElementById('status-text');
+      const dot = document.querySelector('.status .dot');
+      if (el) el.textContent = text;
+      if (status) status.textContent = text;
+      if (dot) {
+        dot.classList.remove('ok', 'err');
+        if (kind === 'success') dot.classList.add('ok');
+        if (kind === 'error') dot.classList.add('err');
+      }
+    }
+
+    function toast(text) {
+      const el = document.getElementById('toast');
+      if (!el) return;
+      el.textContent = text;
+      el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 3200);
+    }
+
+    function renderMarkdown(text) {
+      const md = document.getElementById('response-markdown');
+      if (!md) return;
+      const html = marked.parse(text || '');
+      md.innerHTML = html;
+      md.querySelectorAll('pre code').forEach(block => {
+        hljs.highlightElement(block);
+        const btn = document.createElement('button');
+        btn.textContent = 'Copy code';
+        btn.className = 'copy-btn';
+        btn.addEventListener('click', () => {
+          navigator.clipboard.writeText(block.textContent || '');
+          toast('Code block copied');
+        });
+        block.parentElement.insertBefore(btn, block);
+      });
+    }
+
+    async function loadModels() {
+      // FIXED: Improved error handling - shows errors to user, not just console
+      // Verify qwen2.5-coder:7b is available
+      try {
+        const models = await invokeSafe('get_available_models');
+        if (!models || models.length === 0) {
+          setStatus(`No models found. Install Ollama and run: ollama pull ${REQUIRED_MODEL}`, 'error');
+          toast(`No models found! Run: ollama pull ${REQUIRED_MODEL}`);
+          return false;
+        }
+        if (!models.includes(REQUIRED_MODEL)) {
+          console.warn(`Required model ${REQUIRED_MODEL} not found. Available:`, models);
+          setStatus(`Model not installed. Run: ollama pull ${REQUIRED_MODEL}`, 'error');
+          toast(`Model ${REQUIRED_MODEL} not found! Run: ollama pull ${REQUIRED_MODEL}`);
+          return false;
+        }
+        state.currentModel = REQUIRED_MODEL;
+        return true; // Success
+      } catch (e) {
+        const errorMsg = e?.message || e || 'Unknown error';
+        console.error('loadModels error:', e);
+        setStatus(`Failed to load models: ${errorMsg}`, 'error');
+        toast(`Failed to load models: ${errorMsg}`);
+        return false;
+      }
+    }
+
+    async function performWslValidation() {
+      const out = document.getElementById('validation-output');
+      if (out) {
+        out.textContent = 'Running validation...';
+        out.style.color = 'var(--muted)';
+      }
+      try {
+        const cfg = await invokeSafe('get_driver_config');
+        const diag = await invokeSafe('validate_and_diagnose_wsl', { config: cfg });
+        renderWslDiagnostics(diag);
+        return diag;
+      } catch (e) {
+        if (out) {
+          out.textContent = `Validation failed: ${e}`;
+          out.style.color = '#ef4444';
+        }
+        const warn = document.getElementById('driver-warning');
+        if (warn) warn.style.display = 'block';
+        const compileBtn = document.getElementById('compile-btn');
+        if (compileBtn) compileBtn.disabled = true;
+        return null;
+      }
+    }
+
+    function renderContext(results) {
+      const list = document.getElementById('context-list');
+      if (!list) return;
+      if (!results || !results.length) {
+        list.innerHTML = '<li class="source-item">No references found.</li>';
+        return;
+      }
+      list.innerHTML = results.map((r, idx) => `
+        <li class="source-item">
+          <div class="source-score">#${idx + 1} - ${((r.relevance_score || 0) * 100).toFixed(1)}%</div>
+          <div>${r.path}${r.line_number !== undefined ? `:${r.line_number + 1}` : ''}</div>
+          <pre style="white-space:pre-wrap; margin-top:6px;">${r.snippet}</pre>
+        </li>`).join('');
+    }
+
+    async function fetchContext(question) {
+      try {
+        const results = await invokeSafe('search_references', { query: question, limit: 15 });
+        renderContext(results);
+      } catch (e) {
+        console.warn('context fetch failed', e);
+        renderContext([]);
+      }
+    }
+
+    function setStatusRow(id, ok, message) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const dot = document.createElement('span');
+      dot.className = 'dot ' + (ok ? 'ok' : 'err');
+      el.innerHTML = '';
+      el.appendChild(dot);
+      const text = document.createElement('span');
+      text.textContent = ' ' + message;
+      text.style.marginLeft = '6px';
+      el.appendChild(text);
+    }
+
+    function renderWslDiagnostics(diag) {
+      state.wslDiag = diag;
+      const allOk = diag.wsl_available && (diag.components || []).every(c => c.ok);
+      state.wslReady = allOk;
+
+      const warn = document.getElementById('driver-warning');
+      if (warn) warn.style.display = allOk ? 'none' : 'block';
+
+      const compileBtn = document.getElementById('compile-btn');
+      if (compileBtn) compileBtn.disabled = !allOk;
+
+      const runBtn = document.getElementById('run-btn');
+      if (runBtn) runBtn.disabled = !allOk;
+
+      const statusMap = {
+        'WSL availability': 'status-wsl',
+        'Driver directory': 'status-driver-dir',
+        'Driver binary': 'status-driver-bin',
+        'Library directory': 'status-library-dir',
+      };
+
+      (diag.components || []).forEach(c => {
+        const targetId = statusMap[c.name];
+        if (targetId) {
+          setStatusRow(targetId, c.ok, `${c.name}: ${c.message}`);
+        }
+        if (c.name === 'Driver directory') wslFixes.driverDir = c.fix_command || null;
+        if (c.name === 'Driver binary') wslFixes.driverBin = c.fix_command || null;
+        if (c.name === 'Library directory') wslFixes.libraryDir = c.fix_command || null;
+      });
+
+      const log = document.getElementById('validation-output');
+      if (log) {
+        const lines = [];
+        lines.push(`WSL available: ${diag.wsl_available}`);
+        (diag.components || []).forEach(c => {
+          lines.push(`${c.ok ? 'OK' : 'MISSING'} - ${c.name}: ${c.message}`);
+          if (!c.ok && c.fix_command) lines.push(`Fix: ${c.fix_command}`);
+        });
+        log.textContent = lines.join('\n');
+        log.style.color = allOk ? '#4ade80' : 'var(--muted)';
+      }
+    }
+
+    async function sendPrompt() {
+      const q = (document.getElementById('question').value || '').trim();
+      if (!q) { toast('Enter a prompt first'); return; }
+      if (state.loading) { toast('Already running'); return; }
+
+      const rag = document.getElementById('rag-toggle').checked;
+      const systemPrompt = document.getElementById('system-prompt').value || '';
+      const payloadQuestion = systemPrompt ? `${systemPrompt}\n\n${q}` : q;
+
+      const opts = {
+        model: state.currentModel,
+        question: payloadQuestion,
+        context_type: rag ? 'references' : null,
+        temperature: parseFloat(document.getElementById('temperature').value),
+        top_p: parseFloat(document.getElementById('top-p').value),
+        top_k: parseInt(document.getElementById('top-k').value, 10),
+        num_predict: parseInt(document.getElementById('num-predict').value, 10)
+      };
+
+      state.loading = true;
+      state.cancelToken += 1;
+      const token = state.cancelToken;
+      setStatus('Generating...', 'warning');
+      const started = performance.now();
+      renderMarkdown('');
+      renderValidation(emptyMetrics);
+      renderScorePill(emptyMetrics);
+
+      if (rag) fetchContext(q);
+      persistSettings();
+      store?.setItem('lpc-model', opts.model);
+      document.getElementById('meta-model').textContent = `Model: ${opts.model}`;
+
+      try {
+        const answer = await invokeSafe('ask_ollama', opts);
+        if (token !== state.cancelToken) return; // cancelled
+        renderMarkdown(answer || '');
+        const metrics = analyzeResponse(answer || '');
+        state.lastMetrics = metrics;
+        renderValidation(metrics);
+        renderScorePill(metrics);
+        const latency = performance.now() - started;
+        document.getElementById('meta-latency').textContent = `Latency: ${latency.toFixed(0)} ms`;
+        setStatus('Complete', 'success');
+      } catch (e) {
+        if (token !== state.cancelToken) return;
+        renderMarkdown(`**Error:** ${e?.message || e}`);
+        renderValidation(emptyMetrics);
+        renderScorePill(emptyMetrics);
+        setStatus('Error running generation', 'error');
+      } finally {
+        state.loading = false;
+      }
+    }
+
+    async function stopGeneration() {
+      state.cancelToken += 1;
+      try {
+        await invokeSafe('stop_generation');
+      } catch (e) {
+        console.warn('stop_generation failed', e);
+      }
+      setStatus('Stopped', 'warning');
+    }
+
+    function bindEvents() {
+      function safeAddListener(idOrEl, event, handler) {
+        try {
+          const el = typeof idOrEl === 'string' ? document.getElementById(idOrEl) : idOrEl;
+          if (el) el.addEventListener(event, handler);
+          // Intentionally silent when element is missing to avoid noisy console warnings in production
+        } catch (_) {
+          // Swallow errors silently for robust binding in varied DOM states
+        }
+      }
+
+      ['temperature','top-p','top-k','num-predict'].forEach(id => {
+        safeAddListener(id, 'input', () => { updateSliderLabels(); persistSettings(); });
+      });
+
+      safeAddListener('system-prompt', 'input', persistSettings);
+      safeAddListener('rag-toggle', 'change', persistSettings);
+      safeAddListener('ask-btn', 'click', sendPrompt);
+
+      safeAddListener('clear-btn', 'click', () => {
+        const qEl = document.getElementById('question'); if (qEl) qEl.value = '';
+        renderMarkdown('Cleared.');
+        renderValidation(emptyMetrics);
+        renderScorePill(emptyMetrics);
+        renderContext([]);
+        setStatus('Ready');
+      });
+
+      safeAddListener('copy-response', 'click', () => {
+        const md = document.getElementById('response-markdown');
+        const text = md ? (md.innerText || '') : '';
+        try { navigator.clipboard.writeText(text); toast('Response copied'); } catch (e) {}
+      });
+
+      safeAddListener('copy-to-driver', 'click', async () => { const md = document.getElementById('response-markdown'); if (md) await saveResponseToStaging(md.innerText || '', 'driver'); });
+      safeAddListener('copy-to-library', 'click', async () => { const md = document.getElementById('response-markdown'); if (md) await saveResponseToStaging(md.innerText || '', 'library'); });
+
+      // Model is locked to qwen2.5-coder:7b - removed refresh and selection listeners
+      safeAddListener('stop-btn', 'click', stopGeneration);
+      safeAddListener('question', 'keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') sendPrompt(); });
+      safeAddListener('copy-prompt-btn', 'click', () => {
+        const promptTextEl = document.getElementById('question');
+        const promptText = promptTextEl ? (promptTextEl.value || '') : '';
+        if (!promptText.trim()) { toast('No prompt to copy'); return; }
+        try { navigator.clipboard.writeText(promptText); toast('Prompt copied!'); } catch (e) {}
+      });
+
+      safeAddListener('run-validation-btn', 'click', () => performWslValidation());
+
+      function copyFix(target) {
+        const fix = target === 'driver-dir' ? wslFixes.driverDir : target === 'driver-bin' ? wslFixes.driverBin : target === 'library-dir' ? wslFixes.libraryDir : null;
+        if (!fix) { toast('No fix command available'); return; }
+        try { navigator.clipboard.writeText(fix); toast('Fix command copied'); } catch (e) {}
+      }
+
+      safeAddListener('copy-fix-driver-dir', 'click', () => copyFix('driver-dir'));
+      safeAddListener('copy-fix-driver-bin', 'click', () => copyFix('driver-bin'));
+      safeAddListener('copy-fix-library-dir', 'click', () => copyFix('library-dir'));
+
+      safeAddListener('open-settings-btn', 'click', () => switchTab('settings'));
+      
+      // New button event listeners
+      safeAddListener('refresh-ollama-status-btn', 'click', checkOllamaStatus);
+      safeAddListener('start-ollama-btn', 'click', startOllamaServer);
+      safeAddListener('pull-model-btn', 'click', pullSelectedModel);
+      safeAddListener('save-ollama-config-btn', 'click', saveOllamaConfig);
+      safeAddListener('save-project-paths-btn', 'click', saveProjectPaths);
+
+      // Wizard controls (may be hidden/absent in non-first-run states)
+      safeAddListener('wizard-next', 'click', wizardNext);
+      safeAddListener('wizard-prev', 'click', wizardPrev);
+      safeAddListener('wizard-skip', 'click', () => {
+        hideSetupWizard();
+        if (window.__setupWizardResolve) { window.__setupWizardResolve(); window.__setupWizardResolve = null; }
+      });
+
+      safeAddListener('test-driver-path-btn', 'click', async () => {
+        toast('Testing driver path...');
+        try { const result = await invokeSafe('test_driver_connection'); alert(result); } catch (e) { alert(`Test failed: ${e}`); }
+      });
+
+      safeAddListener('test-library-path-btn', 'click', async () => {
+        toast('Testing library path...');
+        const libraryRootEl = document.getElementById('project-library-root');
+        const libraryRoot = libraryRootEl ? libraryRootEl.value : '';
+        try { alert(`Library path test: Checking ${libraryRoot}`); } catch (e) { alert(`Test failed: ${e}`); }
+      });
+
+      safeAddListener('download-ollama-btn', 'click', () => { window.open('https://ollama.ai/download', '_blank'); });
+      safeAddListener('refresh-staging-btn', 'click', refreshStagedFiles);
+      safeAddListener('clear-all-staging-btn', 'click', clearStaging);
+    }
+
+    // New Ollama and Staging Functions
+
+    async function checkOllamaStatus() {
+      __lpcDiagnostics.log('wizard', 'checkOllamaStatus_start', {});
+      
+      const statusEl = document.getElementById('wizard-ollama-status');
+      const dlBtn = document.getElementById('wizard-ollama-download');
+      const startBtn = document.getElementById('wizard-ollama-start');
+      const readyEl = document.getElementById('wizard-ollama-ready');
+      
+      if (statusEl) statusEl.textContent = 'Checking Ollama...';
+      if (dlBtn) dlBtn.style.display = 'none';
+      if (startBtn) startBtn.style.display = 'none';
+      if (readyEl) readyEl.style.display = 'none';
+
+      try {
+        const status = await invokeSafe('check_ollama_comprehensive');
+        __lpcDiagnostics.log('wizard', 'ollama_status_received', status);
+
+        if (!status.installed) {
+          const msg = status.error || 'Ollama not installed.';
+          if (statusEl) statusEl.textContent = msg;
+          __lpcDiagnostics.log('wizard', 'ollama_not_installed', { error: status.error });
+          
+          if (dlBtn) {
+            dlBtn.style.display = 'inline-flex';
+            safeAddListener(dlBtn, 'click', () => {
+              __lpcDiagnostics.log('wizard', 'download_clicked', {});
+              window.open('https://ollama.com/download', '_blank');
+            });
+          }
+          __wizardState.ollamaReady = false;
+        } else if (!status.running) {
+          const msg = `Ollama ${status.version || ''} installed but not running.`;
+          if (statusEl) statusEl.textContent = msg;
+          __lpcDiagnostics.log('wizard', 'ollama_not_running', { version: status.version });
+          
+          if (startBtn) {
+            startBtn.style.display = 'inline-flex';
+            safeAddListener(startBtn, 'click', async () => {
+              __lpcDiagnostics.log('wizard', 'start_clicked', {});
+              startBtn.disabled = true;
+              startBtn.textContent = 'Starting...';
+              
+              try {
+                const newStatus = await invokeSafe('start_ollama_with_verification');
+                __lpcDiagnostics.log('wizard', 'start_result', newStatus);
+                
+                if (newStatus.running) {
+                  if (statusEl) statusEl.textContent = '✅ Ollama is ready';
+                  if (readyEl) readyEl.style.display = 'block';
+                  __wizardState.ollamaReady = true;
+                } else {
+                  const errMsg = newStatus.error || 'Failed to start Ollama after 10s wait';
+                  if (statusEl) statusEl.textContent = errMsg;
+                  __lpcDiagnostics.log('wizard', 'start_failed', { error: errMsg });
+                  __wizardState.ollamaReady = false;
+                }
+              } catch (e) {
+                const errMsg = 'Error starting Ollama: ' + (e?.message || e);
+                if (statusEl) statusEl.textContent = errMsg;
+                __lpcDiagnostics.log('wizard', 'start_exception', { error: e?.message || e });
+                __wizardState.ollamaReady = false;
+              }
+              
+              renderWizardStep();
+            });
+          }
+          __wizardState.ollamaReady = false;
+        } else {
+          if (statusEl) statusEl.textContent = `✅ Ollama ${status.version || ''} is ready`;
+          if (readyEl) readyEl.style.display = 'block';
+          __lpcDiagnostics.log('wizard', 'ollama_ready', { version: status.version });
+          __wizardState.ollamaReady = true;
+        }
+      } catch (e) {
+        const errMsg = 'Error checking Ollama: ' + (e?.message || e);
+        if (statusEl) statusEl.textContent = errMsg;
+        __lpcDiagnostics.log('wizard', 'check_exception', { error: e?.message || String(e) });
+        __wizardState.ollamaReady = false;
+      }
+      
+      renderWizardStep();
+    }
+
+    function addDiagnosticsExport() {
+      const exportBtn = document.createElement('button');
+      exportBtn.textContent = 'Export Diagnostics';
+      exportBtn.className = 'btn btn-ghost';
+      exportBtn.style.position = 'fixed';
+      exportBtn.style.bottom = '10px';
+      exportBtn.style.right = '10px';
+      exportBtn.style.zIndex = '10000';
+      
+      exportBtn.addEventListener('click', () => {
+        const blob = new Blob([__lpcDiagnostics.export()], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `lpc-diagnostics-${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+      
+      document.body.appendChild(exportBtn);
+    }
+
+    async function startOllamaServer() {
+      const startBtn = document.getElementById('start-ollama-btn');
+      startBtn.disabled = true;
+      startBtn.textContent = 'Starting...';
+      
+      try {
+      await invokeSafe('start_ollama_server');
+        toast('Ollama server starting... Please wait.');
+        
+        // Wait 3 seconds then recheck
+        setTimeout(async () => {
+          await checkOllamaStatus();
+          startBtn.textContent = 'Start Ollama Server';
+        }, 3000);
+      } catch (e) {
+        console.error('Failed to start Ollama:', e);
+        toast(`Failed to start Ollama: ${e}`);
+        startBtn.disabled = false;
+        startBtn.textContent = 'Start Ollama Server';
+      }
+    }
+
+    async function pullSelectedModel() {
+      // FIXED: Better error handling for model pulling
+      const select = document.getElementById('ollama-model-select');
+      const model = select.value;
+      const btn = document.getElementById('pull-model-btn');
+      
+      btn.disabled = true;
+      btn.textContent = 'Pulling...';
+      
+      try {
+        const result = await invokeSafe('pull_ollama_model', { model });
+        toast(result);
+        await loadInstalledModels();
+      } catch (e) {
+        console.error('Failed to pull model:', e);
+        const errorMsg = e?.message || e || 'Unknown error';
+        toast(`Failed to pull model: ${errorMsg}`);
+        alert(`Pull failed. Make sure Ollama is running and you have internet connection.\n\nError: ${errorMsg}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Pull Selected Model';
+      }
+    }
+
+    async function loadInstalledModels() {
+      // FIXED: Better error messages for model list loading
+      const list = document.getElementById('installed-models-list');
+      list.innerHTML = '<span style="color:var(--muted); font-size:12px;">Loading models...</span>';
+      
+      try {
+        const models = await invokeSafe('list_ollama_models');
+        
+        if (!models || models.length === 0) {
+          list.innerHTML = '<span style="color:var(--muted); font-size:12px;">No models installed. Install one using the "Pull Selected Model" button above.</span>';
+          return;
+        }
+        
+        list.innerHTML = models.map(m => 
+          `<div style="padding:4px 8px; margin:4px 0; background:var(--panel-2); border-radius:4px; font-size:12px;">${m}</div>`
+        ).join('');
+      } catch (e) {
+        console.error('Failed to load models:', e);
+        const errorMsg = e?.message || e || 'Unknown error';
+        list.innerHTML = `<span style="color:var(--error); font-size:12px;">Failed to load models: ${errorMsg}</span>`;
+      }
+    }
+
+    async function refreshStagedFiles() {
+      const container = document.getElementById('staged-files-container');
+      container.innerHTML = '<div style="padding:20px; text-align:center; color:var(--muted);">Loading...</div>';
+      
+      try {
+        const config = await invokeSafe('get_driver_config');
+        const stagingDir = config.staging_directory;
+        
+        if (!stagingDir) {
+          container.innerHTML = '<div style="padding:20px; text-align:center; color:var(--muted);">Staging directory not configured. Go to Settings to set it up.</div>';
+          return;
+        }
+        
+        const files = await invokeSafe('list_staged_files', { staging_dir: stagingDir });
+        
+        if (files.length === 0) {
+          container.innerHTML = '<div style="padding:20px; text-align:center; color:var(--muted);">No staged files yet. Generate code in the Assistant tab to get started.</div>';
+          return;
+        }
+        
+        renderStagedFiles(files);
+      } catch (e) {
+        console.error('Failed to load staged files:', e);
+        container.innerHTML = `<div style="padding:20px; text-align:center; color:var(--error);">Error: ${e}</div>`;
+      }
+    }
+
+    function renderStagedFiles(files) {
+      const container = document.getElementById('staged-files-container');
+      
+      container.innerHTML = files.map((file, idx) => {
+        const preview = file.content.substring(0, 200) + (file.content.length > 200 ? '...' : '');
+        const targetBadge = file.target_project === 'driver' ? 
+          '<span class="badge" style="background:var(--accent); color:#0b1016;">Driver</span>' :
+          '<span class="badge" style="background:var(--accent-2); color:#0b1016;">Library</span>';
+        
+        return `
+          <div class="card" style="background:var(--panel-2);">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+              <div style="font-weight:600; color:var(--text);">${file.relative_path}</div>
+              ${targetBadge}
+            </div>
+            <pre style="background:var(--code); padding:8px; border-radius:4px; margin-bottom:8px; font-size:11px; overflow-x:auto; white-space:pre-wrap;">${preview}</pre>
+            <div class="btn-row">
+              <button class="action-btn copy-staged-btn" data-file-idx="${idx}">Copy to ${file.target_project === 'driver' ? 'Driver' : 'Library'}</button>
+              <button class="action-btn" onclick="viewFullFile(${idx})" style="background:transparent; border:1px solid var(--border); color:var(--muted);">View Full</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      // Attach event listeners to copy buttons
+      document.querySelectorAll('.copy-staged-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const idx = parseInt(e.target.getAttribute('data-file-idx'));
+          await copyFileToProject(files[idx]);
+        });
+      });
+    }
+
+    async function copyFileToProject(file) {
+      try {
+        const config = await invokeSafe('get_driver_config');
+        const driverRoot = config.wsl_driver_root || '/home/thurtea/amlp-driver';
+        const libraryRoot = config.wsl_library_root || '/home/thurtea/amlp-library';
+        const useWsl = true; // Always use WSL for now
+        
+        const result = await invokeSafe('copy_staged_to_project', {
+          staged_file: file,
+          driver_root: driverRoot,
+          library_root: libraryRoot,
+          use_wsl: useWsl
+        });
+        
+        toast(result);
+        await refreshStagedFiles();
+      } catch (e) {
+        console.error('Failed to copy file:', e);
+        toast(`Failed to copy file: ${e}`);
+      }
+    }
+
+    async function clearStaging() {
+      if (!confirm('Are you sure you want to clear all staged files? This cannot be undone.')) {
+        return;
+      }
+      
+      try {
+        const config = await invokeSafe('get_driver_config');
+        const stagingDir = config.staging_directory;
+        
+        if (!stagingDir) {
+          toast('Staging directory not configured');
+          return;
+        }
+        
+        await invokeSafe('clear_staging', { staging_dir: stagingDir });
+        toast('Staging cleared');
+        await refreshStagedFiles();
+      } catch (e) {
+        console.error('Failed to clear staging:', e);
+        toast(`Failed to clear staging: ${e}`);
+      }
+    }
+
+    function viewFullFile(idx) {
+      // Future: Open modal or new window with full file content
+      toast('View full file feature coming soon');
+    }
+
+    async function saveOllamaConfig() {
+      const model = document.getElementById('ollama-model-select').value;
+      const statusEl = document.getElementById('ollama-config-status');
+      
+      try {
+        const config = await invokeSafe('get_driver_config');
+        config.ollama_model = model;
+        config.ollama_provider = 'local';
+        config.ollama_enabled_tools = []; // Future expansion
+        
+        await invokeSafe('save_driver_config_cmd', { cfg: config });
+        
+        statusEl.style.display = 'block';
+        statusEl.style.color = 'var(--success)';
+        statusEl.textContent = 'Ollama configuration saved';
+        setTimeout(() => statusEl.style.display = 'none', 3000);
+      } catch (e) {
+        console.error('Failed to save Ollama config:', e);
+        statusEl.style.display = 'block';
+        statusEl.style.color = 'var(--error)';
+        statusEl.textContent = `Failed to save: ${e}`;
+      }
+    }
+
+    async function saveProjectPaths() {
+      const driverRoot = document.getElementById('project-driver-root').value.trim();
+      const libraryRoot = document.getElementById('project-library-root').value.trim();
+      const statusEl = document.getElementById('project-paths-status');
+      
+      if (!driverRoot || !libraryRoot) {
+        statusEl.style.display = 'block';
+        statusEl.style.color = 'var(--warning)';
+        statusEl.textContent = 'Please fill in all paths';
+        return;
+      }
+      
+      try {
+        const config = await invokeSafe('get_driver_config');
+        config.wsl_driver_root = driverRoot;
+        config.wsl_library_root = libraryRoot;
+        config.driver_output_dir = driverRoot + '/src';
+        config.library_output_dir = libraryRoot + '/std';
+        
+        await invokeSafe('save_driver_config_cmd', { cfg: config });
+        
+        statusEl.style.display = 'block';
+        statusEl.style.color = 'var(--success)';
+        statusEl.textContent = 'Project paths saved';
+        setTimeout(() => statusEl.style.display = 'none', 3000);
+      } catch (e) {
+        console.error('Failed to save paths:', e);
+        statusEl.style.display = 'block';
+        statusEl.style.color = 'var(--error)';
+        statusEl.textContent = `Failed to save: ${e}`;
+      }
+    }
+
+    async function loadProjectPaths() {
+      try {
+          const config = await invokeSafe('get_driver_config');
+          document.getElementById('project-driver-root').value = config.wsl_driver_root || '';
+          document.getElementById('project-library-root').value = config.wsl_library_root || '';
+          document.getElementById('staging-directory-display').value = config.staging_directory || 'Not configured';
+        } catch (e) {
+          console.error('Failed to load paths:', e);
+        }
+    }
+
+    // Update existing copy buttons to save to staging first
+    async function saveResponseToStaging(content, targetType) {
+      try {
+        const config = await invokeSafe('get_driver_config');
+        let stagingDir = config.staging_directory;
+        
+        if (!stagingDir) {
+          // Initialize staging directory
+          await invokeSafe('setup_staging_directory');
+          const updatedConfig = await invokeSafe('get_driver_config');
+          stagingDir = updatedConfig.staging_directory;
+        }
+        
+        // Generate filename based on content and type
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const prefix = targetType === 'driver' ? 'driver/' : 'lib/';
+        const relativePath = `${prefix}generated_${timestamp}.c`;
+        
+        await invokeSafe('save_to_staging', {
+          staging_dir: stagingDir,
+          relative_path: relativePath,
+          content: content,
+          target_project: targetType
+        });
+        
+        toast('Saved to staging. Review in Staging tab.');
+        switchTab('staging');
+        await refreshStagedFiles();
+      } catch (e) {
+        console.error('Failed to save to staging:', e);
+        toast(`Failed to save: ${e}`);
+      }
+    }
+
+
+
+    // Robust Tauri invoke helper
+    function getInvoke() {
+      const checks = [
+        () => window.__TAURI__?.core?.invoke,
+        () => window.__TAURI__?.invoke,
+        () => window.__TAURI__?.tauri?.invoke,
+        () => window.__TAURI_INVOKE__
+      ];
+      for (const check of checks) {
+        try {
+          const fn = check();
+          if (typeof fn === 'function') {
+            // bind to appropriate owner when possible
+            try { return fn.bind(window.__TAURI__?.core || window.__TAURI__ || window.__TAURI__?.tauri || window); } catch (_) { return fn; }
+          }
+        } catch (_) {}
+      }
+      throw new Error('Tauri invoke API not available');
+    }
+
+    async function invokeSafe(cmd, args) {
+      const inv = getInvoke();
+      try {
+        return await inv(cmd, args);
+      } catch (e) {
+        console.error(`Tauri command '${cmd}' failed:`, e);
+        throw e;
+      }
+    }
+
+    // Global safeAddListener available to all modules
+    function safeAddListener(idOrEl, event, handler) {
+      try {
+        const el = typeof idOrEl === 'string' ? document.getElementById(idOrEl) : idOrEl;
+        if (el) el.addEventListener(event, handler);
+      } catch (_) {}
+    }
+
+    // Convenience: a direct invoke reference for legacy uses
+    // Diagnostic logging system
+    const __lpcDiagnostics = {
+      events: [],
+      maxEvents: 100,
+  
+      log(category, action, data) {
+        const event = {
+          timestamp: new Date().toISOString(),
+          category,
+          action,
+          data: JSON.stringify(data)
+        };
+        this.events.push(event);
+        if (this.events.length > this.maxEvents) {
+          this.events.shift();
+        }
+    
+        try {
+          localStorage.setItem('lpc-diagnostics', JSON.stringify(this.events));
+        } catch (e) {
+          console.warn('Failed to persist diagnostics', e);
+        }
+    
+        console.log(`[${category}] ${action}:`, data);
+      },
+  
+      export() {
+        return JSON.stringify(this.events, null, 2);
+      },
+  
+      clear() {
+        this.events = [];
+        try {
+          localStorage.removeItem('lpc-diagnostics');
+        } catch (e) {}
+      }
+    };
+
+    let invoke;
+    try { invoke = getInvoke(); } catch (e) { invoke = null; }
+
+    // First-run setup wizard state and functions
+    const __wizardState = { step: 1, ollamaReady: false, stagingCreated: false, wslSaved: false };
+
+    function showSetupWizard() {
+      const overlay = document.getElementById('setup-wizard-overlay');
+      const modal = document.getElementById('setup-wizard');
+      if (!overlay || !modal) return Promise.resolve();
+      overlay.style.display = 'flex';
+      document.body.style.pointerEvents = 'none';
+      modal.style.pointerEvents = 'auto';
+      renderWizardStep();
+      return new Promise(resolve => { window.__setupWizardResolve = resolve; });
+    }
+
+    function hideSetupWizard() {
+      const overlay = document.getElementById('setup-wizard-overlay');
+      if (overlay) overlay.style.display = 'none';
+      document.body.style.pointerEvents = '';
+    }
+
+    function renderWizardStep() {
+      const body = document.getElementById('wizard-body');
+      const steps = document.querySelectorAll('.wizard-step');
+      steps.forEach(s => s.classList.remove('active'));
+      const active = document.querySelector(`.wizard-step[data-step="${__wizardState.step}"]`);
+      if (active) active.classList.add('active');
+      if (!body) return;
+      if (__wizardState.step === 1) {
+        body.innerHTML = `
+          <h3>Ollama</h3>
+          <p>We will check if Ollama is installed and running.</p>
+          <div id="wizard-ollama-status" style="margin-top:8px; color:var(--muted);">Checking...</div>
+          <div style="margin-top:12px; display:flex; gap:8px;">
+            <button id="wizard-ollama-download" class="action-btn" style="display:none; background:transparent;">Download Ollama</button>
+            <button id="wizard-ollama-start" class="action-btn" style="display:none;">Start Ollama</button>
+          </div>
+        `;
+        // Use the centralized status checker with timeout
+        checkOllamaStatus();
+      } else if (__wizardState.step === 2) {
+        const defaultPath = 'C:\\Users\\<your-user>\\AppData\\Local\\LPC Dev Assistant\\staging';
+        body.innerHTML = `
+          <h3>Staging Directory</h3>
+          <p>Set a staging directory where generated files will be saved. You can change this later.</p>
+          <input id="wizard-staging-input" class="wizard-input" value="${defaultPath}" />
+          <div style="margin-top:12px; display:flex; gap:8px;">
+            <button id="wizard-staging-create" class="action-btn">Create Directory</button>
+            <span id="wizard-staging-status" style="margin-left:8px; color:var(--muted);"></span>
+          </div>
+        `;
+        safeAddListener('wizard-staging-create', 'click', createStagingDir);
+      } else if (__wizardState.step === 3) {
+        body.innerHTML = `
+          <h3>WSL Setup (optional)</h3>
+          <p>Configure WSL paths for driver integration. You can skip this step.</p>
+          <label>WSL Username</label>
+          <input id="wizard-wsl-user" class="wizard-input" placeholder="your-linux-username" />
+          <label style="margin-top:8px; display:block;">Driver Root Path (WSL)</label>
+          <input id="wizard-driver-root" class="wizard-input" placeholder="/home/username/amlp-driver" />
+          <label style="margin-top:8px; display:block;">Library Root Path (WSL)</label>
+          <input id="wizard-library-root" class="wizard-input" placeholder="/home/username/amlp-library" />
+          <div style="margin-top:12px; display:flex; gap:8px;">
+            <button id="wizard-wsl-save" class="action-btn">Save</button>
+            <button id="wizard-wsl-skip" class="action-btn" style="background:transparent;">Skip</button>
+            <span id="wizard-wsl-status" style="margin-left:8px; color:var(--muted);"></span>
+          </div>
+        `;
+        safeAddListener('wizard-wsl-save', 'click', async () => {
+          const user = document.getElementById('wizard-wsl-user')?.value.trim() || '';
+          const driverRoot = document.getElementById('wizard-driver-root')?.value.trim() || '';
+          const libraryRoot = document.getElementById('wizard-library-root')?.value.trim() || '';
+          const statusEl = document.getElementById('wizard-wsl-status');
+          if (statusEl) statusEl.textContent = 'Saving...';
+          try {
+            const cfg = { wsl_username: user, wsl_driver_root: driverRoot, wsl_library_root: libraryRoot };
+            await invokeSafe('save_driver_config_cmd', { cfg });
+            __wizardState.wslSaved = true;
+            if (statusEl) statusEl.textContent = 'Saved';
+          } catch (e) { if (statusEl) statusEl.textContent = `Failed: ${e}`; }
+        });
+        safeAddListener('wizard-wsl-skip', 'click', () => { __wizardState.wslSaved = false; wizardNext(); });
+      } else if (__wizardState.step === 4) {
+        body.innerHTML = `
+          <h3>Done</h3>
+          <p>Setup summary:</p>
+          <ul id="wizard-summary" style="color:var(--muted);"></ul>
+          <div style="margin-top:12px; display:flex; gap:8px; justify-content:flex-end;">
+            <button id="wizard-finish" class="action-btn">Start Using LPC Dev Assistant</button>
+          </div>
+        `;
+        const sum = document.getElementById('wizard-summary');
+        sum.innerHTML = `
+          <li>Ollama: ${__wizardState.ollamaReady ? 'Ready' : 'Not ready'}</li>
+          <li>Staging: ${__wizardState.stagingCreated ? 'Created' : 'Not created'}</li>
+          <li>WSL configured: ${__wizardState.wslSaved ? 'Yes' : 'No'}</li>
+        `;
+        safeAddListener('wizard-finish', 'click', wizardFinish);
+      }
+      // update prev/next visibility and enablement
+      const nextBtn = document.getElementById('wizard-next');
+      const prevBtn = document.getElementById('wizard-prev');
+      if (prevBtn) prevBtn.style.display = __wizardState.step > 1 ? 'inline-flex' : 'none';
+      if (nextBtn) nextBtn.textContent = __wizardState.step < 4 ? 'Next' : 'Finish';
+      // Disable Next on step 1 until Ollama is ready; otherwise enable
+      if (__wizardState.step === 1) {
+        if (nextBtn) nextBtn.disabled = !__wizardState.ollamaReady;
+      } else {
+        if (nextBtn) nextBtn.disabled = false;
+      }
+    }
+
+    async function wizardNext() {
+      if (__wizardState.step === 1 && !__wizardState.ollamaReady) {
+        // require Ollama ready or allow proceed but warn; allow proceed
+      }
+      if (__wizardState.step === 2 && !__wizardState.stagingCreated) {
+        // allow proceeding but recommend creating; allow proceed
+      }
+      if (__wizardState.step < 4) {
+        __wizardState.step += 1; renderWizardStep();
+      } else {
+        // finish
+        await wizardFinish();
+      }
+    }
+
+    function wizardPrev() { if (__wizardState.step > 1) { __wizardState.step -= 1; renderWizardStep(); } }
+    
+
+    async function createStagingDir() {
+      const input = document.getElementById('wizard-staging-input');
+      const statusEl = document.getElementById('wizard-staging-status');
+      if (!input || !statusEl) return;
+      statusEl.textContent = 'Creating...';
+      try {
+        await invokeSafe('setup_staging_directory');
+        // refresh config
+        const cfg = await invokeSafe('get_driver_config');
+        if (cfg && cfg.staging_directory) {
+          statusEl.textContent = 'Created: ' + cfg.staging_directory;
+          __wizardState.stagingCreated = true;
+        } else {
+          statusEl.textContent = 'Created (verify in Settings)';
+          __wizardState.stagingCreated = true;
+        }
+      } catch (e) { statusEl.textContent = 'Failed: ' + e; }
+      // enable Next after creating staging
+      __wizardState.stagingCreated = true;
+      renderWizardStep();
+    }
+
+    async function wizardFinish() {
+      try {
+        await invokeSafe('mark_setup_complete');
+      } catch (e) {
+        console.warn('mark_setup_complete failed', e);
+      }
+      hideSetupWizard();
+      if (window.__setupWizardResolve) { window.__setupWizardResolve(); window.__setupWizardResolve = null; }
+    }
+
+    // Simple initialization pattern without complex timing issues
+    window.addEventListener('DOMContentLoaded', async () => {
+      console.log('DOM loaded, starting init...');
+      
+      // Check if setup is complete, redirect to wizard if not
+      try {
+        if (typeof invoke !== 'undefined' && invoke) {
+          const config = await invokeSafe('get_user_config');
+          if (!config || !config.setup_complete) {
+            console.log('Setup not complete, redirecting to wizard...');
+            window.location.href = 'setup-wizard.html';
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to check user config:', e);
+        // If config check fails, redirect to setup wizard to be safe
+        window.location.href = 'setup-wizard.html';
+        return;
+      }
+      
+      // Try to check Ollama availability but do NOT auto-start it.
+      try {
+        if (typeof invoke !== 'undefined' && invoke) {
+          try {
+            const available = await invokeSafe('check_ollama_available');
+            if (!available) {
+              console.log('Ollama not available at startup; will not auto-start without user consent.');
+            }
+          } catch (e) {
+            console.warn('Early Ollama availability check failed:', e);
+          }
+        }
+      } catch (_) {}
+      
+      // Perform initial UI setup immediately
+      loadSettings();
+      bindEvents();
+      addDiagnosticsExport();
+      renderValidation(emptyMetrics);
+      renderScorePill(emptyMetrics);
+      
+      // Brief delay to ensure Tauri fully ready before first invoke
+      await new Promise(r => setTimeout(r, 200));
+      
+      setStatus('Initializing...', 'info');
+
+      // If first-run, show blocking setup wizard before continuing
+      try {
+        const setupStatus = await invokeSafe('get_setup_status');
+        if (setupStatus && setupStatus.first_run) {
+          setStatus('First run detected - running setup', 'info');
+          await showSetupWizard();
+        }
+      } catch (e) {
+        console.warn('Failed to get setup status for wizard:', e);
+      }
+
+      // Test Tauri connection first
+      try {
+        if (!invoke) {
+          throw new Error('Tauri invoke not available');
+        }
+        console.log('Testing Tauri invoke...');
+        const test = await invoke('get_setup_status');
+        console.log('Tauri invoke works!', test);
+      } catch (e) {
+        console.error('TAURI INVOKE FAILED:', e);
+        setStatus('Initialization error (see notification)', 'error');
+        toast('Tauri API not available: ' + e.message);
+        return; // Stop here if Tauri isn't working
+      }
+      
+      // Now proceed with rest of initialization
+      try {
+        setStatus('Checking setup status...', 'info');
+        try {
+          await checkSetup();
+        } catch (e) {
+          console.error('Setup check failed:', e);
+          toast(`Warning: Setup check failed: ${e?.message || e}`);
+        }
+        
+        setStatus('Checking Ollama service...', 'info');
+        try {
+          await checkAndStartOllama();
+        } catch (e) {
+          console.error('Ollama check failed:', e);
+          toast(`Warning: Ollama check failed: ${e?.message || e}`);
+        }
+        
+        setStatus('Loading available models...', 'info');
+        let modelsLoaded = false;
+        try {
+          modelsLoaded = await loadModels();
+          if (!modelsLoaded) {
+            console.warn('Model verification failed');
+            toast('Warning: Could not verify required model');
+          }
+        } catch (e) {
+          console.error('Load models failed:', e);
+          toast(`Warning: Could not load models: ${e?.message || e}`);
+        }
+        
+        setStatus('Loading configuration...', 'info');
+        try {
+          await performWslValidation();
+        } catch (e) {
+          console.warn('WSL validation failed:', e);
+        }
+        
+        try {
+          await checkOllamaStatus();
+        } catch (e) {
+          console.warn('Ollama status check failed:', e);
+        }
+        
+        try {
+          await loadProjectPaths();
+        } catch (e) {
+          console.warn('Load project paths failed:', e);
+        }
+        
+        // FIXED: Only set Ready if critical operations succeeded
+        if (modelsLoaded) {
+          setStatus('Ready', 'success');
+        } else {
+          setStatus('Ready (with warnings - see notification)', 'warning');
+        }
+      } catch (error) {
+        console.error('Init error:', error);
+        setStatus('Initialization error (see notification)', 'error');
+        toast('Initialization failed: ' + error.message);
+      }
+    });
+
+    // Check availability; if user agrees, attempt to start the Ollama server once.
+    async function checkAndStartOllama() {
+      try {
+        const available = await invokeSafe('check_ollama_available');
+        if (available) return true;
+
+        const start = confirm('Ollama is not running. Would you like to start it? (Recommended)');
+        if (!start) return false;
+
+        // Use the server-start command that the backend exposes.
+        try {
+          await invokeSafe('start_ollama_server');
+        } catch (startErr) {
+          console.error('start_ollama_server failed:', startErr);
+          alert('Failed to start Ollama automatically: ' + (startErr?.message || startErr));
+          return false;
+        }
+
+        // Poll briefly for availability (one short attempt)
+        await new Promise(r => setTimeout(r, 3000));
+        try {
+          const nowAvailable = await invokeSafe('check_ollama_available');
+          if (nowAvailable) {
+            alert('Ollama started successfully!');
+            return true;
+          }
+        } catch (e) {
+          console.warn('Post-start availability check failed', e);
+        }
+
+        alert('Could not confirm Ollama started. Please start it manually.');
+        return false;
+      } catch (e) {
+        console.warn('Ollama availability check failed', e);
+        return false;
+      }
+    }
+
+    async function checkSetup() {
+      try {
+        const status = await invokeSafe('get_setup_status');
+        
+        if (!status.ollama_installed) {
+          const startOllama = confirm(
+            'Ollama not detected!\n\n' +
+            'LPC Dev Assistant requires Ollama to be installed and running.\n\n' +
+            'Would you like to start Ollama now?\n\n' +
+            'Click OK to start "ollama serve", or Cancel to continue without it.'
+          );
+          if (startOllama) {
+              try {
+              setStatus('Starting Ollama...', 'info');
+              await invokeSafe('start_ollama');
+              toast('Starting Ollama... Please wait.');
+              // Poll for availability up to ~8 seconds
+              for (let i = 0; i < 4; i++) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                try {
+                  await invokeSafe('check_ollama_health');
+                  setStatus('Ready', 'success');
+                  break;
+                } catch (pollErr) {
+                  if (i === 3) {
+                    throw pollErr;
+                  }
+                  setStatus('Connecting to Ollama...', 'info');
+                }
+              }
+            } catch (e) {
+              const proceed = confirm(
+                'Failed to confirm Ollama startup: ' + e + '\n\n' +
+                'Please start Ollama manually by running "ollama serve" in a terminal.\n\n' +
+                'Click OK to continue anyway.'
+              );
+              if (!proceed) {
+                window.close();
+                return;
+              }
+            }
+          }
+        }
+        
+        if (status.first_run && !status.index_built) {
+          const runSetup = confirm(
+            'First Run Setup\n\n' +
+            'The application needs to extract reference archives and build the search index.\n' +
+            'This may take a few minutes.\n\n' +
+            'Click OK to run setup now.'
+          );
+          
+          if (runSetup) {
+            setStatus('Running initial setup...', 'warning');
+            try {
+              const result = await invokeSafe('run_initial_setup');
+              toast(result);
+              await invokeSafe('mark_setup_complete');
+              setStatus('Setup complete', 'success');
+            } catch (e) {
+              setStatus('Setup failed: ' + e, 'error');
+              toast('Setup failed. Some features may not work.');
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Setup check failed', e);
+      }
+    }
+
+    // Tab switching
+    function switchTab(tabName) {
+      // Hide all tabs
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      
+      // Show selected tab
+      const tabEl = document.getElementById(tabName);
+      if (tabEl) tabEl.classList.add('active');
+      
+      // Mark button as active
+      const btnEl = document.querySelector(`[data-tab="${tabName}"]`);
+      if (btnEl) btnEl.classList.add('active');
+      
+      // Refresh staging files when switching to staging tab
+      if (tabName === 'staging') {
+        refreshStagedFiles();
+      }
+    }
+
+    // Tab button click handlers
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tabName = btn.getAttribute('data-tab');
+        if (tabName) switchTab(tabName);
+      });
+    });
+
+    // Driver tab event handlers
+    document.getElementById('test-connection-btn')?.addEventListener('click', async () => {
+      const statusEl = document.getElementById('connection-status');
+      statusEl.textContent = 'Testing connection...';
+      statusEl.style.color = 'var(--muted)';
+        try {
+        const result = await invokeSafe('test_driver_connection');
+        statusEl.textContent = result;
+        statusEl.style.color = '#4ade80';
+      } catch (error) {
+        statusEl.textContent = `Error: ${error}`;
+        statusEl.style.color = '#ef4444';
+      }
+    });
+
+    document.getElementById('compile-btn')?.addEventListener('click', async () => {
+      const outputEl = document.getElementById('compile-output');
+      const filePath = document.getElementById('lpc-file-path').value.trim();
+      
+      if (!filePath) {
+        outputEl.textContent = 'Please enter a file path';
+        outputEl.style.color = '#ef4444';
+        return;
+      }
+      
+      outputEl.textContent = 'Compiling...';
+      outputEl.style.color = 'var(--muted)';
+      
+      try {
+        const result = await invokeSafe('compile_lpc', { file_path: filePath });
+        
+        const stdoutText = (result.stdout || []).join('\n');
+        const stderrText = (result.stderr || []).join('\n');
+        const output = stdoutText || stderrText || '(no output)';
+        
+        if (result.success) {
+          outputEl.textContent = `Compilation successful (exit code ${result.exit_code || 0})\n\n${output}`;
+          outputEl.style.color = '#4ade80';
+        } else {
+          outputEl.textContent = `Compilation failed (exit code ${result.exit_code || 'unknown'})\n\n${output}`;
+          outputEl.style.color = '#ef4444';
+        }
+      } catch (error) {
+        outputEl.textContent = `Error: ${error}`;
+        outputEl.style.color = '#ef4444';
+      }
+    });
+
+    document.getElementById('run-btn')?.addEventListener('click', async () => {
+      const outputEl = document.getElementById('run-output');
+      const filePath = document.getElementById('lpc-run-file-path').value.trim();
+      
+      if (!filePath) {
+        outputEl.textContent = 'Please enter a file path';
+        outputEl.style.color = '#ef4444';
+        return;
+      }
+      
+      outputEl.textContent = 'Running...';
+      outputEl.style.color = 'var(--muted)';
+      
+      try {
+        const result = await invokeSafe('run_lpc', { file_path: filePath });
+        
+        const output = result.output || '(no output)';
+        const errors = result.errors || '(no errors)';
+        
+        if (result.success) {
+          outputEl.textContent = `Run successful (exit code ${result.exit_code || 0})\n\nOutput:\n${output}\n\nErrors:\n${errors}`;
+          outputEl.style.color = '#4ade80';
+        } else {
+          outputEl.textContent = `Run failed (exit code ${result.exit_code || 'unknown'})\n\nOutput:\n${output}\n\nErrors:\n${errors}`;
+          outputEl.style.color = '#ef4444';
+        }
+      } catch (error) {
+        outputEl.textContent = `Error: ${error}`;
+        outputEl.style.color = '#ef4444';
+      }
+    });
+
+    document.getElementById('build-ui-btn')?.addEventListener('click', async () => {
+      const outputEl = document.getElementById('build-output');
+      outputEl.textContent = 'Building...';
+      outputEl.style.color = 'var(--muted)';
+      try {
+        const result = await invokeSafe('build_driver_ui');
+        outputEl.textContent = result;
+        outputEl.style.color = '#4ade80';
+      } catch (error) {
+        outputEl.textContent = `Error: ${error}`;
+        outputEl.style.color = '#ef4444';
+      }
+    });
+
+    // Settings handlers
+    document.getElementById('load-config-btn')?.addEventListener('click', async () => {
+      const out = document.getElementById('settings-output');
+      out.textContent = 'Loading config...';
+      try {
+        const cfg = await invokeSafe('get_driver_config');
+        document.getElementById('wsl-username').value = cfg.wsl_username || '';
+        document.getElementById('wsl-driver-root').value = cfg.wsl_driver_root || '';
+        document.getElementById('wsl-library-root').value = cfg.wsl_library_root || '';
+        out.textContent = 'Config loaded.';
+        out.style.color = '#4ade80';
+      } catch (e) {
+        out.textContent = `Error loading config: ${e}`;
+        out.style.color = '#ef4444';
+      }
+    });
+
+    document.getElementById('save-config-btn')?.addEventListener('click', async () => {
+      const out = document.getElementById('settings-output');
+      out.textContent = 'Saving config...';
+      const cfg = {
+        wsl_username: document.getElementById('wsl-username').value.trim(),
+        wsl_driver_root: document.getElementById('wsl-driver-root').value.trim(),
+        wsl_library_root: document.getElementById('wsl-library-root').value.trim(),
+      };
+      try {
+        await invokeSafe('save_driver_config_cmd', { cfg: cfg });
+        out.textContent = 'Config saved.';
+        out.style.color = '#4ade80';
+      } catch (e) {
+        out.textContent = `Error saving config: ${e}`;
+        out.style.color = '#ef4444';
+      }
+    });
+
+    document.getElementById('test-paths-btn')?.addEventListener('click', async () => {
+      const out = document.getElementById('settings-output');
+      out.textContent = 'Testing WSL driver path...';
+      try {
+        const result = await invokeSafe('test_driver_connection');
+        out.textContent = result;
+        out.style.color = '#4ade80';
+      } catch (e) {
+        out.textContent = `Path test failed: ${e}`;
+        out.style.color = '#ef4444';
+      }
+    });
+
+    // Generated Code Tab - File Operations
+    document.getElementById('save-to-driver-btn')?.addEventListener('click', async () => {
+      const filename = document.getElementById('driver-filename').value.trim();
+      const contents = document.getElementById('driver-output').value;
+      const statusEl = document.getElementById('driver-save-status');
+      
+      if (!filename) {
+        statusEl.style.display = 'block';
+        statusEl.textContent = 'Please enter a filename';
+        statusEl.style.borderColor = 'var(--warning)';
+        statusEl.style.color = 'var(--warning)';
+        return;
+      }
+      
+      if (!contents.trim()) {
+        statusEl.style.display = 'block';
+        statusEl.textContent = 'No content to save';
+        statusEl.style.borderColor = 'var(--warning)';
+        statusEl.style.color = 'var(--warning)';
+        return;
+      }
+      
+      statusEl.style.display = 'block';
+      statusEl.textContent = 'Saving to driver...';
+      statusEl.style.borderColor = 'var(--accent)';
+      statusEl.style.color = 'var(--accent)';
+      
+      try {
+        const wslPath = await invokeSafe('save_to_driver', {
+          filename: filename,
+          contents: contents,
+          subdirectory: null
+        });
+        
+        statusEl.textContent = `Saved successfully to: ${wslPath}`;
+        statusEl.style.borderColor = 'var(--success)';
+        statusEl.style.color = 'var(--success)';
+        toast('Driver file saved!');
+      } catch (error) {
+        statusEl.textContent = `Save failed: ${error}`;
+        statusEl.style.borderColor = 'var(--error)';
+        statusEl.style.color = 'var(--error)';
+        toast(`Save failed: ${error}`);
+      }
+    });
+
+    document.getElementById('save-to-library-btn')?.addEventListener('click', async () => {
+      const filename = document.getElementById('library-filename').value.trim();
+      const contents = document.getElementById('library-output').value;
+      const statusEl = document.getElementById('library-save-status');
+      
+      if (!filename) {
+        statusEl.style.display = 'block';
+        statusEl.textContent = 'Please enter a filename';
+        statusEl.style.borderColor = 'var(--warning)';
+        statusEl.style.color = 'var(--warning)';
+        return;
+      }
+      
+      if (!contents.trim()) {
+        statusEl.style.display = 'block';
+        statusEl.textContent = 'No content to save';
+        statusEl.style.borderColor = 'var(--warning)';
+        statusEl.style.color = 'var(--warning)';
+        return;
+      }
+      
+      statusEl.style.display = 'block';
+      statusEl.textContent = 'Saving to library...';
+      statusEl.style.borderColor = 'var(--accent)';
+      statusEl.style.color = 'var(--accent)';
+      
+      try {
+        const wslPath = await invokeSafe('save_to_library', {
+          filename: filename,
+          contents: contents,
+          subdirectory: null
+        });
+        
+        statusEl.textContent = `Saved successfully to: ${wslPath}`;
+        statusEl.style.borderColor = 'var(--success)';
+        statusEl.style.color = 'var(--success)';
+        toast('Library file saved!');
+      } catch (error) {
+        statusEl.textContent = `Save failed: ${error}`;
+        statusEl.style.borderColor = 'var(--error)';
+        statusEl.style.color = 'var(--error)';
+        toast(`Save failed: ${error}`);
+      }
+    });
+
+    document.getElementById('browse-driver-btn')?.addEventListener('click', async () => {
+      try {
+        const selected = await invokeSafe('browse_wsl_directory');
+        if (selected) {
+          document.getElementById('driver-output-path').value = selected;
+          toast(`Selected: ${selected}`);
+        }
+      } catch (error) {
+        toast(`Browse failed: ${error}`);
+      }
+    });
+
+    document.getElementById('browse-library-btn')?.addEventListener('click', async () => {
+      try {
+        const selected = await invokeSafe('browse_wsl_directory');
+        if (selected) {
+          document.getElementById('library-output-path').value = selected;
+          toast(`Selected: ${selected}`);
+        }
+      } catch (error) {
+        toast(`Browse failed: ${error}`);
+      }
+    });
+
+    document.getElementById('load-paths-config-btn')?.addEventListener('click', async () => {
+      const statusEl = document.getElementById('paths-config-status');
+      statusEl.style.display = 'block';
+      statusEl.textContent = 'Loading configuration...';
+      statusEl.style.borderColor = 'var(--accent)';
+      statusEl.style.color = 'var(--accent)';
+      
+      try {
+        const config = await invokeSafe('get_driver_config');
+        
+        document.getElementById('driver-output-path').value = 
+          config.driver_output_dir || '/home/thurtea/amlp-driver/src';
+        
+        document.getElementById('library-output-path').value = 
+          config.library_output_dir || '/home/thurtea/amlp-library/std';
+        
+        statusEl.textContent = 'Configuration loaded successfully';
+        statusEl.style.borderColor = 'var(--success)';
+        statusEl.style.color = 'var(--success)';
+      } catch (error) {
+        statusEl.textContent = `Failed to load config: ${error}`;
+        statusEl.style.borderColor = 'var(--error)';
+        statusEl.style.color = 'var(--error)';
+      }
+    });
+
+    document.getElementById('save-paths-config-btn')?.addEventListener('click', async () => {
+      const statusEl = document.getElementById('paths-config-status');
+      const config = {
+        workspace_root: '',
+        wsl_driver_root: document.getElementById('wsl-driver-root')?.value || '/home/thurtea/amlp-driver',
+        wsl_library_root: document.getElementById('wsl-library-root')?.value || '/home/thurtea/amlp-library',
+        driver_output_dir: document.getElementById('driver-output-path').value,
+        library_output_dir: document.getElementById('library-output-path').value
+      };
+      
+      statusEl.style.display = 'block';
+      statusEl.textContent = 'Saving configuration...';
+      statusEl.style.borderColor = 'var(--accent)';
+      statusEl.style.color = 'var(--accent)';
+      
+      try {
+        await invokeSafe('save_driver_config_cmd', { cfg: config });
+        statusEl.textContent = 'Configuration saved successfully';
+        statusEl.style.borderColor = 'var(--success)';
+        statusEl.style.color = 'var(--success)';
+        toast('Configuration saved!');
+      } catch (error) {
+        statusEl.textContent = `Failed to save config: ${error}`;
+        statusEl.style.borderColor = 'var(--error)';
+        statusEl.style.color = 'var(--error)';
+        toast(`Save failed: ${error}`);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Setup Wizard - Local Doc Assistant</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .wizard-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            max-width: 700px;
+            width: 100%;
+            padding: 40px;
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        .step {
+            display: none;
+        }
+        .step.active {
+            display: block;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        input[type="text"], select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .extension-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .extension-item {
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .extension-item:hover {
+            border-color: #667eea;
+        }
+        .extension-item.selected {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        .progress-bar {
+            height: 4px;
+            background: #ddd;
+            margin-bottom: 30px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #667eea;
+            transition: width 0.3s;
+        }
+        .success-message {
+            text-align: center;
+            color: #28a745;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="wizard-container">
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 25%"></div>
+        </div>
+
+        <!-- Step 1: Project Name -->
+        <div class="step active" id="step1">
+            <h1>Welcome to Local Doc Assistant</h1>
+            <p>Let's set up your project. First, give it a name:</p>
+            <div class="form-group">
+                <label for="projectName">Project Name</label>
+                <input type="text" id="projectName" placeholder="My Awesome Project" value="My Project">
+            </div>
+            <button onclick="nextStep(2)">Next</button>
+        </div>
+
+        <!-- Step 2: Select Directory -->
+        <div class="step" id="step2">
+            <h1>Select Your Code Directory</h1>
+            <p>Choose the directory containing the code you want to index:</p>
+            <div class="form-group">
+                <label for="projectDir">Project Directory</label>
+                <input type="text" id="projectDir" readonly placeholder="Click Browse to select...">
+                <button onclick="browseDirectory()" style="margin-top: 10px">Browse...</button>
+            </div>
+            <button onclick="nextStep(1)">Back</button>
+            <button onclick="nextStep(3)" id="step2Next" disabled>Next</button>
+        </div>
+
+        <!-- Step 3: Select File Types -->
+        <div class="step" id="step3">
+            <h1>Select File Types to Index</h1>
+            <p>Choose which types of files to include in your documentation:</p>
+            <div class="extension-grid" id="extensionGrid"></div>
+            <button onclick="nextStep(2)">Back</button>
+            <button onclick="nextStep(4)" id="step3Next">Next</button>
+        </div>
+
+        <!-- Step 4: Select Model -->
+        <div class="step" id="step4">
+            <h1>Choose Your LLM Model</h1>
+            <p>Select which Ollama model to use for answering questions:</p>
+            <div class="form-group">
+                <label for="modelSelect">Available Models</label>
+                <select id="modelSelect">
+                    <option value="">Loading models...</option>
+                </select>
+            </div>
+            <button onclick="nextStep(3)">Back</button>
+            <button onclick="finishSetup()">Finish Setup</button>
+        </div>
+
+        <!-- Step 5: Complete -->
+        <div class="step" id="step5">
+            <h1>Setup Complete!</h1>
+            <div class="success-message">
+                <p>✓ Your project has been configured successfully!</p>
+                <p id="indexStatus">Building index...</p>
+            </div>
+            <button onclick="launchApp()" id="launchButton" disabled>Launch Application</button>
+        </div>
+    </div>
+
+    <script>
+        const { invoke } = window.__TAURI__.core;
+        
+        let currentStep = 1;
+        let selectedExtensions = [];
+        let projectDirectory = '';
+
+        async function init() {
+            // Load available file extension presets
+            const presets = await invoke('get_common_file_extensions');
+            const grid = document.getElementById('extensionGrid');
+            
+            presets.forEach(preset => {
+                const div = document.createElement('div');
+                div.className = 'extension-item';
+                div.textContent = preset.name;
+                div.dataset.extensions = JSON.stringify(preset.extensions);
+                div.onclick = () => toggleExtension(div, preset.extensions);
+                grid.appendChild(div);
+            });
+
+            // Load available Ollama models
+            try {
+                const models = await invoke('list_ollama_models');
+                const select = document.getElementById('modelSelect');
+                select.innerHTML = '';
+                models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model;
+                    option.textContent = model;
+                    if (model.includes('qwen2.5-coder')) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+            } catch (e) {
+                alert('Failed to load Ollama models. Make sure Ollama is running.');
+            }
+        }
+
+        function toggleExtension(element, extensions) {
+            element.classList.toggle('selected');
+            
+            if (element.classList.contains('selected')) {
+                selectedExtensions.push(...extensions);
+            } else {
+                selectedExtensions = selectedExtensions.filter(ext => !extensions.includes(ext));
+            }
+            
+            // Remove duplicates
+            selectedExtensions = [...new Set(selectedExtensions)];
+        }
+
+        async function browseDirectory() {
+            try {
+                const result = await invoke('browse_project_directory');
+                if (result) {
+                    projectDirectory = result;
+                    document.getElementById('projectDir').value = result;
+                    document.getElementById('step2Next').disabled = false;
+                }
+            } catch (e) {
+                alert('Failed to browse directory: ' + e);
+            }
+        }
+
+        function nextStep(step) {
+            // Hide current step
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            
+            // Show target step
+            document.getElementById('step' + step).classList.add('active');
+            currentStep = step;
+            
+            // Update progress bar
+            const progress = (step / 5) * 100;
+            document.getElementById('progressFill').style.width = progress + '%';
+        }
+
+        async function finishSetup() {
+            const projectName = document.getElementById('projectName').value;
+            const model = document.getElementById('modelSelect').value;
+            
+            if (!projectName || !projectDirectory || selectedExtensions.length === 0 || !model) {
+                alert('Please complete all steps before finishing setup.');
+                return;
+            }
+
+            try {
+                // Save configuration
+                await invoke('configure_user_project', {
+                    name: projectName,
+                    directory: projectDirectory,
+                    extensions: selectedExtensions,
+                    model: model
+                });
+
+                // Move to completion step
+                nextStep(5);
+
+                // Build the index
+                const result = await invoke('rebuild_document_index', {
+                    directory: projectDirectory,
+                    extensions: selectedExtensions
+                });
+
+                document.getElementById('indexStatus').textContent = '✓ ' + result;
+                document.getElementById('launchButton').disabled = false;
+
+            } catch (e) {
+                alert('Setup failed: ' + e);
+            }
+        }
+
+        function launchApp() {
+            window.location.href = 'index.html';
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

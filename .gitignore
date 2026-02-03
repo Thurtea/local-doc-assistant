@@ -1,0 +1,66 @@
+# Rust
+target/
+!target/release/bundle/msi/*.msi
+!target/release/bundle/nsis/*.exe
+Cargo.lock
+
+# Node/Vite (if tauri ui)
+node_modules/
+dist/
+
+# Generated
+lpc-dev-assistant/gen/
+lpc-dev-assistant/target/
+gen/
+.index/
+.vite/
+
+# Data (repos only source, not extracted)
+mud-references/extracted/
+mud-references/*.zip
+mud-references/*.tgz
+mud-references/*.tar.gz
+
+# Logs/Temp
+*.log
+*.txt
+!README*.txt
+.DS_Store
+.setup_complete
+dev_server_log.txt
+model_comparison_*.txt
+model_comparison_*.json
+
+# Documentation (keep only essential)
+session-notes/
+*SUMMARY*.md
+*ROADMAP*.md
+*GUIDE*.md
+*CHANGES*.md
+BUILD_INFO.md
+WSL_INTEGRATION_STATUS.md
+QUICK_START.md
+docs/*SUMMARY*.md
+docs/*ROADMAP*.md  
+docs/*GUIDE*.md
+docs/*CHANGES*.md
+md_files/
+
+# Test/diagnostic scripts
+test_*.ps1
+diagnostic_*.ps1
+
+# Old/Backup
+icons/old_icons/
+heart_beat_*.c
+gui.py
+app-icon.png
+*.exe.old
+*.msi.old
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

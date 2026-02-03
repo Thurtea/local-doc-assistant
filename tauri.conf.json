@@ -1,0 +1,81 @@
+{
+  "productName": "Local Doc Assistant",
+  "version": "2.0.0",
+  "identifier": "com.local-doc-assistant",
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "devUrl": null,
+    "frontendDist": "./ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPDATA/*", "$RESOURCE/*"]
+      }
+    },
+    "windows": [
+      {
+        "title": "Local Doc Assistant",
+        "width": 1400,
+        "height": 900,
+        "center": true,
+        "resizable": true,
+        "maximized": true,
+        "fullscreen": false,
+        "decorations": true,
+        "alwaysOnTop": false,
+        "label": "main",
+        "url": "index.html"
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [
+      "templates/*"
+    ],
+    "externalBin": [],
+    "copyright": "Copyright 2026",
+    "category": "DeveloperTool",
+    "shortDescription": "Local Doc Assistant",
+    "longDescription": "A configurable local document assistant that indexes any codebase and provides AI-powered answers using Ollama and RAG-based code search.",
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "wix": {
+        "language": "en-US"
+      },
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      },
+      "allowDowngrades": true
+    },
+    "linux": {
+      "deb": {
+        "depends": [],
+        "desktopTemplate": null
+      },
+      "appimage": {}
+    },
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "10.13",
+      "signingIdentity": null,
+      "providerShortName": null,
+      "entitlements": null
+    }
+  }
+}

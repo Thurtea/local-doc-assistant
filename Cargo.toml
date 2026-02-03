@@ -1,0 +1,87 @@
+[package]
+name = "local-doc-assistant"
+version = "2.0.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "A configurable local document assistant powered by Ollama and Rust"
+default-run = "local-doc-assistant"
+
+[lib]
+name = "local_doc_assistant"
+path = "src/lib.rs"
+
+[dependencies]
+tauri = { version = "2.1", optional = true, features = ["protocol-asset"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.42", features = ["full"] }
+futures = "0.3"
+syntect = "5.2"
+eframe = "0.29"
+egui = "0.29"
+egui_extras = { version = "0.29", features = ["syntect"] }
+iced = { version = "0.9", optional = true }
+
+tokio-stream = "0.1"
+reqwest = { version = "0.12", features = ["json", "stream", "blocking"] }
+anyhow = "1.0"
+async-stream = "0.3"
+walkdir = "2.5"
+tantivy = { version = "0.22", features = ["lz4-compression"] }
+zip = "2.2"
+tar = "0.4"
+flate2 = "1.0"
+chrono = "0.4"
+regex = "1.9"
+dirs = "4.0"
+rfd = "0.12"
+
+[[bin]]
+name = "local-doc-assistant"
+path = "src-tauri/src/main.rs"
+required-features = ["with_tauri"]
+
+[[bin]]
+name = "test_cli"
+path = "src/bin/test_cli.rs"
+
+[[bin]]
+name = "run_stream_test"
+path = "src/bin/run_stream_test.rs"
+
+[[bin]]
+name = "run_ui_tests"
+path = "src/bin/run_ui_tests.rs"
+
+[[bin]]
+name = "egui_gui"
+path = "src/bin/egui_gui.rs"
+
+[[bin]]
+name = "gui"
+path = "src/bin/gui.rs"
+required-features = ["iced-gui"]
+
+[[bin]]
+name = "model_comparison"
+path = "src/bin/model_comparison.rs"
+
+[[bin]]
+name = "enhanced_query"
+path = "src/bin/enhanced_query.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.1", features = [] }
+
+[features]
+default = ["with_tauri"]
+with_tauri = ["tauri"]
+custom-protocol = ["tauri/custom-protocol"]
+iced-gui = ["iced"]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "z"
+strip = true

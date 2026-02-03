@@ -567,10 +567,10 @@
   <!-- Driver Tab -->
   <div id="driver" class="tab-content">
     <div class="card">
-      <h3 style="margin-top: 0;">AMLP Driver Integration</h3>
+      <h3 style="margin-top: 0;">Driver Integration</h3>
       <p style="color: var(--muted); font-size: 14px;">Test WSL command execution and project file compilation.</p>
       <p style="color: var(--muted); font-size: 13px; margin-top: 8px; line-height: 1.6;">
-        <strong>Note:</strong> This feature requires Windows Subsystem for Linux (WSL) and an AMLP driver.<br>
+        <strong>Note:</strong> This feature requires Windows Subsystem for Linux (WSL) and a local driver.<br>
         If you don't have WSL setup, click the Settings tab above for a step-by-step guide.
       </p>
       <div id="driver-warning" style="display:none; margin-top:12px; padding:12px; border-radius:8px; border:1px solid var(--warning); background:rgba(251,191,36,0.1); color: var(--warning);">
@@ -677,7 +677,7 @@
     <div class="card" style="background: var(--panel); border: 1px solid var(--border);">
       <h3 style="margin-top: 0; color: var(--accent);">WSL Setup Required (Optional)</h3>
       <p style="color: var(--text); font-size: 14px; line-height: 1.6; margin-bottom: 12px;">
-        <strong>What is this?</strong> The Driver Integration feature lets you compile and test LPC code using a local AMLP driver running in Windows Subsystem for Linux (WSL).
+        <strong>What is this?</strong> The Driver Integration feature lets you compile and test code using a local driver running in Windows Subsystem for Linux (WSL).
       </p>
       <p style="color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 12px;">
         <strong>Do I need this?</strong> No! The AI assistant works perfectly without WSL. This is only needed if you want to compile/run LPC code directly from the app.
@@ -695,16 +695,16 @@
           <p style="margin-top: 4px; font-size: 12px;">(This shows your Linux username, e.g., "thurtea" or "john")</p>
           
           <p style="margin-top: 12px;"><strong>Step 3:</strong> Create directories for the driver</p>
-          <pre style="background: var(--code); padding: 8px; border-radius: 4px; margin: 8px 0;">wsl mkdir -p ~/amlp-driver ~/amlp-library</pre>
+          <pre style="background: var(--code); padding: 8px; border-radius: 4px; margin: 8px 0;">wsl mkdir -p ~/driver ~/library</pre>
           
           <p style="margin-top: 12px;"><strong>Step 4:</strong> Enter your settings below</p>
           <ul style="margin: 8px 0; padding-left: 20px;">
             <li>WSL Username: Your Linux username from Step 2</li>
-            <li>Driver Root: <code>/home/YOUR_USERNAME/amlp-driver</code></li>
-            <li>Library Root: <code>/home/YOUR_USERNAME/amlp-library</code></li>
+            <li>Driver Root: <code>/home/YOUR_USERNAME/driver</code></li>
+            <li>Library Root: <code>/home/YOUR_USERNAME/library</code></li>
           </ul>
           
-          <p style="margin-top: 12px;"><strong>Step 5:</strong> Install/build your AMLP driver</p>
+          <p style="margin-top: 12px;"><strong>Step 5:</strong> Install/build your driver</p>
           <p style="font-size: 12px;">Copy your driver source to the WSL directory and build it following your driver's build instructions.</p>
           
           <p style="margin-top: 12px;"><strong>Step 6:</strong> Click "Run Validation" below to verify everything works!</p>
@@ -787,13 +787,13 @@
 
     <div class="card">
       <h3>Project Paths</h3>
-      <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">Configure paths to your AMLP Driver and Library projects.</p>
+      <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">Configure paths to your driver and library projects.</p>
       
-      <label style="display:block; margin-bottom:6px; color:var(--text); font-weight:600;">AMLP Driver Root (WSL)</label>
+      <label style="display:block; margin-bottom:6px; color:var(--text); font-weight:600;">Driver Root (WSL)</label>
       <input type="text" id="project-driver-root" placeholder="/home/thurtea/amlp-driver" style="width:100%; margin-bottom:8px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px;">
       <button id="test-driver-path-btn" class="action-btn" style="background:transparent; border:1px solid var(--border); color:var(--muted); margin-bottom:16px;">Test Driver Path</button>
       
-      <label style="display:block; margin-bottom:6px; color:var(--text); font-weight:600;">AMLP Library Root (WSL)</label>
+      <label style="display:block; margin-bottom:6px; color:var(--text); font-weight:600;">Library Root (WSL)</label>
       <input type="text" id="project-library-root" placeholder="/home/thurtea/amlp-library" style="width:100%; margin-bottom:8px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px;">
       <button id="test-library-path-btn" class="action-btn" style="background:transparent; border:1px solid var(--border); color:var(--muted); margin-bottom:16px;">Test Library Path</button>
       
@@ -836,7 +836,7 @@
         </div>
       </div>
       <p style="color: var(--muted); font-size: 13px; margin-bottom: 16px;">
-        Review generated code before copying to your AMLP projects. Files are saved here first, then you can verify and copy them individually.
+        Review generated code before copying to your projects. Files are saved here first, then you can verify and copy them individually.
       </p>
       
       <div id="staged-files-container" style="display:flex; flex-direction:column; gap:12px;">
@@ -2012,16 +2012,36 @@
       if (__wizardState.step === 2 && !__wizardState.stagingCreated) {
         // allow proceeding but recommend creating; allow proceed
       }
-      if (__wizardState.step < 4) {
-        __wizardState.step += 1; renderWizardStep();
-      } else {
-        // finish
-        await wizardFinish();
+      if (__wizardState.step === 2) {
+        const defaultPath = 'C:\\Users\\<your-user>\\AppData\\Local\\Local Doc Assistant\\staging';
+        body.innerHTML = `
+          <h3>Staging Directory</h3>
+          <p>Set a staging directory where generated files will be saved. You can change this later.</p>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input id="wizard-staging-input" class="wizard-input" value="${defaultPath}" style="flex:1" />
+            <button id="wizard-staging-browse" class="action-btn" style="white-space:nowrap;">Browse</button>
+          </div>
+          <div style="margin-top:12px; display:flex; gap:8px;">
+            <button id="wizard-staging-create" class="action-btn">Create Directory</button>
+            <span id="wizard-staging-status" style="margin-left:8px; color:var(--muted);"></span>
+          </div>
+        `;
+        safeAddListener('wizard-staging-create', 'click', createStagingDir);
+        safeAddListener('wizard-staging-browse', 'click', async () => {
+          try {
+            const selected = await invokeSafe('browse_project_directory');
+            if (selected) {
+              const input = document.getElementById('wizard-staging-input');
+              if (input) input.value = selected;
+              const statusEl = document.getElementById('wizard-staging-status');
+              if (statusEl) statusEl.textContent = 'Selected: ' + selected;
+            }
+          } catch (e) {
+            const statusEl = document.getElementById('wizard-staging-status');
+            if (statusEl) statusEl.textContent = 'Browse failed: ' + (e?.message || e);
+          }
+        });
       }
-    }
-
-    function wizardPrev() { if (__wizardState.step > 1) { __wizardState.step -= 1; renderWizardStep(); } }
-    
 
     async function createStagingDir() {
       const input = document.getElementById('wizard-staging-input');
@@ -2029,18 +2049,30 @@
       if (!input || !statusEl) return;
       statusEl.textContent = 'Creating...';
       try {
-        await invokeSafe('setup_staging_directory');
-        // refresh config
+        const desired = (input.value || '').trim();
+        if (desired) {
+          try {
+            // Try a backend command that accepts a path (if implemented); fallback to default command
+            await invokeSafe('setup_staging_directory_at', { path: desired });
+          } catch (_) {
+            await invokeSafe('setup_staging_directory');
+          }
+        } else {
+          await invokeSafe('setup_staging_directory');
+        }
+
         const cfg = await invokeSafe('get_driver_config');
         if (cfg && cfg.staging_directory) {
           statusEl.textContent = 'Created: ' + cfg.staging_directory;
+          input.value = cfg.staging_directory;
           __wizardState.stagingCreated = true;
         } else {
           statusEl.textContent = 'Created (verify in Settings)';
           __wizardState.stagingCreated = true;
         }
-      } catch (e) { statusEl.textContent = 'Failed: ' + e; }
-      // enable Next after creating staging
+      } catch (e) {
+        statusEl.textContent = 'Failed: ' + e;
+      }
       __wizardState.stagingCreated = true;
       renderWizardStep();
     }

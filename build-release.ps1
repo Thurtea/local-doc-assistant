@@ -21,7 +21,7 @@ Write-Host "[2/7] Verifying version numbers..." -ForegroundColor Yellow
 $cargoVersion = (Get-Content "Cargo.toml" | Select-String "version = " | Select-Object -First 1) -replace '.*version = "([^"]+)".*', '$1'
 $tauriVersion = (Get-Content "tauri.conf.json" | Select-String '"version":' | Select-Object -First 1) -replace '.*"version":\s*"([^"]+)".*', '$1'
 
-if ($cargoVersion -eq "1.3.0" -and $tauriVersion -eq "1.3.0") {
+if ($cargoVersion -eq $tauriVersion) {
     Write-Host "  Cargo.toml version: $cargoVersion" -ForegroundColor Green
     Write-Host "  tauri.conf.json version: $tauriVersion" -ForegroundColor Green
 } else {

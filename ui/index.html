@@ -27,12 +27,12 @@
 
     // Lightweight runtime error capture (shows errors in UI and stores them in localStorage)
     // This does NOT depend on Tauri and helps capture renderer console errors when DevTools isn't available.
-    window.__lpc_runtime_errors = window.__lpc_runtime_errors || [];
+    window.__lda_runtime_errors = window.__lda_runtime_errors || [];
 
     function recordRuntimeError(entry) {
       try {
-        window.__lpc_runtime_errors.push(entry);
-        localStorage.setItem('lpc-runtime-errors', JSON.stringify(window.__lpc_runtime_errors));
+        window.__lda_runtime_errors.push(entry);
+        localStorage.setItem('lda-runtime-errors', JSON.stringify(window.__lda_runtime_errors));
       } catch (_) {}
       console.error('Captured runtime error (overlay):', entry);
     }
@@ -50,10 +50,10 @@
     // Inject a small errors panel when DOM is ready so you can see messages without DevTools
     document.addEventListener('DOMContentLoaded', () => {
       try {
-        const existing = document.getElementById('lpc-runtime-errors-panel');
+        const existing = document.getElementById('lda-runtime-errors-panel');
         if (existing) return;
         const panel = document.createElement('div');
-        panel.id = 'lpc-runtime-errors-panel';
+        panel.id = 'lda-runtime-errors-panel';
         panel.style.position = 'fixed';
         panel.style.right = '12px';
         panel.style.bottom = '12px';
@@ -70,7 +70,7 @@
         panel.title = 'Runtime errors (click to hide)';
         panel.addEventListener('click', () => { panel.style.display = panel.style.display === 'none' ? 'block' : 'none'; });
 
-        const stored = localStorage.getItem('lpc-runtime-errors');
+        const stored = localStorage.getItem('lda-runtime-errors');
         if (stored) {
           try {
             const arr = JSON.parse(stored) || [];
@@ -568,7 +568,7 @@
   <div id="driver" class="tab-content">
     <div class="card">
       <h3 style="margin-top: 0;">AMLP Driver Integration</h3>
-      <p style="color: var(--muted); font-size: 14px;">Test WSL command execution and LPC file compilation.</p>
+      <p style="color: var(--muted); font-size: 14px;">Test WSL command execution and project file compilation.</p>
       <p style="color: var(--muted); font-size: 13px; margin-top: 8px; line-height: 1.6;">
         <strong>Note:</strong> This feature requires Windows Subsystem for Linux (WSL) and an AMLP driver.<br>
         If you don't have WSL setup, click the Settings tab above for a step-by-step guide.
@@ -588,8 +588,8 @@
     </div>
 
     <div class="card">
-      <h3>Compile LPC File</h3>
-      <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">Compile an LPC file using the amlp-driver</p>
+      <h3>Compile Project File</h3>
+      <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">Compile a project file using the configured driver</p>
       <label style="display: block; margin-bottom: 6px; color: var(--text); font-weight: 600;">File Path (WSL):</label>
       <input type="text" id="lpc-file-path" placeholder="/home/thurtea/amlp-library/master.c" style="width: 100%; margin-bottom: 12px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 13px;">
       <button id="compile-btn" class="action-btn">Compile File</button>
@@ -597,8 +597,8 @@
     </div>
 
     <div class="card">
-      <h3>Run LPC File</h3>
-      <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">Run an LPC file using the amlp-driver (compile and execute)</p>
+      <h3>Run Project File</h3>
+      <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">Run a project file using the configured driver (compile and execute)</p>
       <label style="display: block; margin-bottom: 6px; color: var(--text); font-weight: 600;">File Path (WSL):</label>
       <input type="text" id="lpc-run-file-path" placeholder="/home/thurtea/amlp-driver/tests/lpc/simple.c" style="width: 100%; margin-bottom: 12px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 13px;">
       <button id="run-btn" class="action-btn">Run File</button>
@@ -855,7 +855,7 @@
       try { return window.localStorage; } catch { return null; }
     })();
 
-    // Required model for LPC Development Assistant
+    // Required model for Local Doc Assistant
     const REQUIRED_MODEL = 'qwen2.5-coder:7b';
 
     const state = {
@@ -970,11 +970,11 @@
         rag: document.getElementById('rag-toggle').checked,
         system_prompt: document.getElementById('system-prompt').value || ''
       };
-      store.setItem('lpc-settings', JSON.stringify(payload));
+      store.setItem('lda-settings', JSON.stringify(payload));
     }
 
     function loadSettings() {
-      const raw = store?.getItem('lpc-settings');
+      const raw = store?.getItem('lda-settings');
       const data = raw ? { ...settingsDefaults, ...JSON.parse(raw) } : settingsDefaults;
       document.getElementById('temperature').value = data.temperature;
       document.getElementById('top-p').value = data.top_p;
@@ -1194,7 +1194,7 @@
 
       if (rag) fetchContext(q);
       persistSettings();
-      store?.setItem('lpc-model', opts.model);
+      store?.setItem('lda-model', opts.model);
       document.getElementById('meta-model').textContent = `Model: ${opts.model}`;
 
       try {
@@ -1327,7 +1327,7 @@
     // New Ollama and Staging Functions
 
     async function checkOllamaStatus() {
-      __lpcDiagnostics.log('wizard', 'checkOllamaStatus_start', {});
+      __ldaDiagnostics.log('wizard', 'checkOllamaStatus_start', {});
       
       const statusEl = document.getElementById('wizard-ollama-status');
       const dlBtn = document.getElementById('wizard-ollama-download');
@@ -1341,17 +1341,17 @@
 
       try {
         const status = await invokeSafe('check_ollama_comprehensive');
-        __lpcDiagnostics.log('wizard', 'ollama_status_received', status);
+        __ldaDiagnostics.log('wizard', 'ollama_status_received', status);
 
         if (!status.installed) {
           const msg = status.error || 'Ollama not installed.';
           if (statusEl) statusEl.textContent = msg;
-          __lpcDiagnostics.log('wizard', 'ollama_not_installed', { error: status.error });
+          __ldaDiagnostics.log('wizard', 'ollama_not_installed', { error: status.error });
           
           if (dlBtn) {
             dlBtn.style.display = 'inline-flex';
             safeAddListener(dlBtn, 'click', () => {
-              __lpcDiagnostics.log('wizard', 'download_clicked', {});
+              __ldaDiagnostics.log('wizard', 'download_clicked', {});
               window.open('https://ollama.com/download', '_blank');
             });
           }
@@ -1359,18 +1359,18 @@
         } else if (!status.running) {
           const msg = `Ollama ${status.version || ''} installed but not running.`;
           if (statusEl) statusEl.textContent = msg;
-          __lpcDiagnostics.log('wizard', 'ollama_not_running', { version: status.version });
+          __ldaDiagnostics.log('wizard', 'ollama_not_running', { version: status.version });
           
           if (startBtn) {
             startBtn.style.display = 'inline-flex';
             safeAddListener(startBtn, 'click', async () => {
-              __lpcDiagnostics.log('wizard', 'start_clicked', {});
+              __ldaDiagnostics.log('wizard', 'start_clicked', {});
               startBtn.disabled = true;
               startBtn.textContent = 'Starting...';
               
               try {
                 const newStatus = await invokeSafe('start_ollama_with_verification');
-                __lpcDiagnostics.log('wizard', 'start_result', newStatus);
+                __ldaDiagnostics.log('wizard', 'start_result', newStatus);
                 
                 if (newStatus.running) {
                   if (statusEl) statusEl.textContent = '✅ Ollama is ready';
@@ -1379,13 +1379,13 @@
                 } else {
                   const errMsg = newStatus.error || 'Failed to start Ollama after 10s wait';
                   if (statusEl) statusEl.textContent = errMsg;
-                  __lpcDiagnostics.log('wizard', 'start_failed', { error: errMsg });
+                  __ldaDiagnostics.log('wizard', 'start_failed', { error: errMsg });
                   __wizardState.ollamaReady = false;
                 }
               } catch (e) {
                 const errMsg = 'Error starting Ollama: ' + (e?.message || e);
                 if (statusEl) statusEl.textContent = errMsg;
-                __lpcDiagnostics.log('wizard', 'start_exception', { error: e?.message || e });
+                __ldaDiagnostics.log('wizard', 'start_exception', { error: e?.message || e });
                 __wizardState.ollamaReady = false;
               }
               
@@ -1396,13 +1396,13 @@
         } else {
           if (statusEl) statusEl.textContent = `✅ Ollama ${status.version || ''} is ready`;
           if (readyEl) readyEl.style.display = 'block';
-          __lpcDiagnostics.log('wizard', 'ollama_ready', { version: status.version });
+          __ldaDiagnostics.log('wizard', 'ollama_ready', { version: status.version });
           __wizardState.ollamaReady = true;
         }
       } catch (e) {
         const errMsg = 'Error checking Ollama: ' + (e?.message || e);
         if (statusEl) statusEl.textContent = errMsg;
-        __lpcDiagnostics.log('wizard', 'check_exception', { error: e?.message || String(e) });
+        __ldaDiagnostics.log('wizard', 'check_exception', { error: e?.message || String(e) });
         __wizardState.ollamaReady = false;
       }
       
@@ -1419,11 +1419,11 @@
       exportBtn.style.zIndex = '10000';
       
       exportBtn.addEventListener('click', () => {
-        const blob = new Blob([__lpcDiagnostics.export()], { type: 'application/json' });
+        const blob = new Blob([__ldaDiagnostics.export()], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `lpc-diagnostics-${Date.now()}.json`;
+        a.download = `lda-diagnostics-${Date.now()}.json`;
         a.click();
         URL.revokeObjectURL(url);
       });
@@ -1854,10 +1854,10 @@
 
     // Convenience: a direct invoke reference for legacy uses
     // Diagnostic logging system
-    const __lpcDiagnostics = {
+    const __ldaDiagnostics = {
       events: [],
       maxEvents: 100,
-  
+
       log(category, action, data) {
         const event = {
           timestamp: new Date().toISOString(),
@@ -1869,24 +1869,24 @@
         if (this.events.length > this.maxEvents) {
           this.events.shift();
         }
-    
+
         try {
-          localStorage.setItem('lpc-diagnostics', JSON.stringify(this.events));
+          localStorage.setItem('lda-diagnostics', JSON.stringify(this.events));
         } catch (e) {
           console.warn('Failed to persist diagnostics', e);
         }
-    
+
         console.log(`[${category}] ${action}:`, data);
       },
-  
+
       export() {
         return JSON.stringify(this.events, null, 2);
       },
-  
+
       clear() {
         this.events = [];
         try {
-          localStorage.removeItem('lpc-diagnostics');
+          localStorage.removeItem('lda-diagnostics');
         } catch (e) {}
       }
     };
@@ -2241,7 +2241,7 @@
         if (!status.ollama_installed) {
           const startOllama = confirm(
             'Ollama not detected!\n\n' +
-            'LPC Dev Assistant requires Ollama to be installed and running.\n\n' +
+            'Local Doc Assistant requires Ollama to be installed and running.\n\n' +
             'Would you like to start Ollama now?\n\n' +
             'Click OK to start "ollama serve", or Cancel to continue without it.'
           );

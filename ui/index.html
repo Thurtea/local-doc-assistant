@@ -458,9 +458,9 @@
 <body>
   <!-- First-run Setup Wizard Modal (single instance) removed duplicate markup; the canonical modal below is used -->
   <header>
-    <div class="title">
+      <div class="title">
       <div>
-        <div>LPC Dev Assistant</div>
+        <div>Local Doc Assistant</div>
       </div>
     </div>
       <div class="controls">
@@ -1928,7 +1928,7 @@
         // Use the centralized status checker with timeout
         checkOllamaStatus();
       } else if (__wizardState.step === 2) {
-        const defaultPath = 'C:\\Users\\<your-user>\\AppData\\Local\\LPC Dev Assistant\\staging';
+        const defaultPath = 'C:\\Users\\<your-user>\\AppData\\Local\\Local Doc Assistant\\staging';
         body.innerHTML = `
           <h3>Staging Directory</h3>
           <p>Set a staging directory where generated files will be saved. You can change this later.</p>
@@ -1975,7 +1975,7 @@
           <p>Setup summary:</p>
           <ul id="wizard-summary" style="color:var(--muted);"></ul>
           <div style="margin-top:12px; display:flex; gap:8px; justify-content:flex-end;">
-            <button id="wizard-finish" class="action-btn">Start Using LPC Dev Assistant</button>
+            <button id="wizard-finish" class="action-btn">Start Using Local Doc Assistant</button>
           </div>
         `;
         const sum = document.getElementById('wizard-summary');

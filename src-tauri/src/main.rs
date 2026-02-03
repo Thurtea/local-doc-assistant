@@ -233,7 +233,8 @@ async fn check_ollama_available() -> Result<bool, String> {
     match client.list_models().await {
         Ok(models) => {
             // Check if required model is available
-            let required_model = "qwen2.5-coder:3b";
+            // Align required model with frontend default (qwen2.5-coder:7b)
+            let required_model = "qwen2.5-coder:7b";
             Ok(models.iter().any(|m| m.contains(required_model)))
         }
         Err(_) => Ok(false)
@@ -278,7 +279,8 @@ fn check_ollama_health() -> Result<serde_json::Value, String> {
     let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
     match rt.block_on(async { client.list_models().await.map_err(|e| e.to_string()) }) {
         Ok(models) => {
-            let required_model = "qwen2.5-coder:3b";
+            // Align required model with frontend default (qwen2.5-coder:7b)
+            let required_model = "qwen2.5-coder:7b";
             let has_required = models.iter().any(|m| m.contains(required_model));
             Ok(serde_json::json!({
                 "ok": true,
@@ -874,7 +876,7 @@ async fn setup_staging_directory() -> Result<String, String> {
 }
 
 fn main() {
-    eprintln!("Starting LPC Dev Assistant...");
+    eprintln!("Starting Local Doc Assistant...");
 
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     eprintln!("Working directory: {:?}", cwd);

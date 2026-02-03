@@ -66,3 +66,6 @@ app-icon.png
 *~
 # Archive of agent-generated files
 archive/generated-by-agent/
+
+# Hidden folder for moved root docs and scripts
+/.hidden_root_files/

@@ -1,0 +1,55 @@
+name: Build release bundles (Linux & macOS)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-bundles:
+    name: Build and attach bundles
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Install Tauri CLI
+        run: |
+          npm install -g @tauri-apps/cli || true
+
+      - name: Build release (cargo)
+        run: |
+          cargo build --release
+
+      - name: Build Tauri bundles
+        run: |
+          # Use npx to invoke tauri build (works with global install too)
+          npx tauri build || cargo tauri build || true
+
+      - name: List bundles
+        run: ls -R target/release/bundle || true
+
+      - name: Create or update GitHub release and upload bundles
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          files: |
+            target/release/bundle/**
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

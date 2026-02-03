@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "identifier": "com.local-doc-assistant",
   "build": {
-    "beforeDevCommand": "powershell -ExecutionPolicy Bypass -File \"E:/Work/local-doc-assistant/scripts/copy-icons.ps1\"",
+    "beforeDevCommand": "powershell -ExecutionPolicy Bypass -File E:/Work/local-doc-assistant/scripts/copy-icons.ps1",
     "beforeBuildCommand": "",
     "devUrl": null,
     "frontendDist": "./ui"

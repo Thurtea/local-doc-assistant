@@ -81,19 +81,20 @@
   </script>
   <style>
     :root {
-      --bg: #0d1117;
-      --panel: #161b22;
-      --panel-2: #1c2128;
-      --text: #c9d1d9;
-      --muted: #8b949e;
-      --accent: #58a6ff;
-      --accent-2: #1f6feb;
-      --border: #30363d;
-      --shadow: 0 12px 40px rgba(0,0,0,0.4);
-      --success: #3fb950;
+      /* Dark theme tuned to match thurtea.com */
+      --bg: #070708;
+      --panel: #0b0c0d;
+      --panel-2: #0f1112;
+      --text: #d2d9d9;
+      --muted: #7f8b8b;
+      --accent: #00c2b3; /* teal */
+      --accent-2: #089e93; /* darker teal */
+      --border: #141616;
+      --shadow: 0 12px 40px rgba(0,0,0,0.6);
+      --success: #24c27a;
       --warning: #d29922;
       --error: #f85149;
-      --code: #0d1117;
+      --code: #060607;
     }
 
     * { box-sizing: border-box; }
@@ -667,7 +668,7 @@
 
   <!-- Settings Tab -->
   <div id="settings" class="tab-content">
-    <div class="card" style="background: linear-gradient(135deg, rgba(59,130,246,0.05) 0%, rgba(147,51,234,0.05) 100%); border: 1px solid var(--accent);">
+    <div class="card" style="background: var(--panel); border: 1px solid var(--border);">
       <h3 style="margin-top: 0; color: var(--accent);">WSL Setup Required (Optional)</h3>
       <p style="color: var(--text); font-size: 14px; line-height: 1.6; margin-bottom: 12px;">
         <strong>What is this?</strong> The Driver Integration feature lets you compile and test LPC code using a local AMLP driver running in Windows Subsystem for Linux (WSL).

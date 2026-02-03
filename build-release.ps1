@@ -1,8 +1,8 @@
-# LPC Dev Assistant - Release Build Script v1.3.0
+# Local Doc Assistant - Release Build Script v1.3.0
 # This script helps build and package the release installers
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "LPC Dev Assistant - Release Build v1.3.0" -ForegroundColor Cyan
+Write-Host "Local Doc Assistant - Release Build v1.3.0" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -72,8 +72,8 @@ Write-Host ""
 
 # Step 6: Verify installers
 Write-Host "[6/7] Verifying installers..." -ForegroundColor Yellow
-$msiPath = "target/release/bundle/msi/LPC Dev Assistant_1.3.0_x64_en-US.msi"
-$nsisPath = "target/release/bundle/nsis/LPC Dev Assistant_1.3.0_x64-setup.exe"
+$msiPath = "target/release/bundle/msi/Local Doc Assistant_1.3.0_x64_en-US.msi"
+$nsisPath = "target/release/bundle/nsis/Local Doc Assistant_1.3.0_x64-setup.exe"
 
 if (Test-Path $msiPath) {
     $msiSize = (Get-Item $msiPath).Length / 1MB

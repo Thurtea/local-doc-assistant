@@ -860,7 +860,7 @@ fn get_common_file_extensions() -> Result<Vec<serde_json::Value>, String> {
 async fn setup_staging_directory() -> Result<String, String> {
     // Determine staging directory path
     let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
-    let staging_dir = home_dir.join(".lpc-dev-assistant").join("staging");
+    let staging_dir = home_dir.join(".local-doc-assistant").join("staging");
     
     // Create staging directory
     std::fs::create_dir_all(&staging_dir)

@@ -139,7 +139,7 @@ impl Application for LPCGui {
     }
 
     fn title(&self) -> String {
-        String::from("LPC Dev Assistant - Native GUI")
+        String::from("Local Doc Assistant - Native GUI")
     }
 
     fn theme(&self) -> Theme {
@@ -298,7 +298,7 @@ impl Application for LPCGui {
 
     fn view(&self) -> Element<'_, Message> {
         // Title
-        let title = Text::new("🎮 LPC MUD Development Assistant")
+        let title = Text::new("Local Doc Assistant")
             .size(24);
 
         // Model picker
@@ -625,7 +625,7 @@ async fn generate_response(
 }
 
 fn load_context_template(context: &Context) -> Result<String, String> {
-    let base_path = "E:\\Work\\AMLP\\lpc-dev-assistant\\templates";
+    let base_path = "E:\\Work\\local-doc-assistant\\templates";
 
     let filename = match context {
         Context::Driver => "driver_context.txt",

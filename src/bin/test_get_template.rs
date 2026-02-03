@@ -2,7 +2,7 @@ use local_doc_assistant::ContextManager;
 
 fn main() -> anyhow::Result<()> {
     let cwd = std::env::current_dir()?;
-    let root = if cwd.ends_with("lpc-dev-assistant") {
+        let root = if cwd.ends_with("local-doc-assistant") {
         cwd.parent().map(|p| p.to_path_buf()).unwrap_or(cwd.clone())
     } else { cwd };
     let cm = ContextManager::new(root);

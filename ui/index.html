@@ -181,6 +181,10 @@
       box-shadow: var(--shadow);
     }
 
+    /* Allow flex children to shrink/grow so paired columns match heights */
+    .card { min-height: 0; }
+    .card textarea, .card .response { min-height: 0; flex: 1; }
+
     .section-title {
       display: flex;
       align-items: center;
@@ -509,10 +513,10 @@
   <div id="assistant" class="tab-content active">
     <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 18px; padding: 18px 24px; height: calc(100vh - 160px);">
       <div class="card" style="display: flex; flex-direction: column;">
-        <div class="section-title">
-          <span>Prompt</span>
-        </div>
-        <textarea id="question" placeholder="Ask about driver, efuns, mudlib patterns, or paste code for guidance..." style="flex: 1; resize: none; min-height: 200px;"></textarea>
+          <div class="section-title">
+            <span>Prompt</span>
+          </div>
+          <textarea id="question" placeholder="Ask a question, describe a problem, or paste code for guidance..." style="flex: 1; resize: none; min-height: 0;"></textarea>
         <div class="btn-row" style="margin-top:12px;">
           <button class="primary" id="ask-btn">Ask</button>
           <button id="stop-btn">Stop</button>

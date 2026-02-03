@@ -54,7 +54,7 @@ impl Default for DriverConfig {
 }
 
 pub fn config_path() -> Option<PathBuf> {
-    dirs::config_dir().map(|d: PathBuf| d.join("lpc_dev_assistant_driver_config.json"))
+    dirs::config_dir().map(|d: PathBuf| d.join("local_doc_assistant_driver_config.json"))
 }
 
 pub fn load_driver_config() -> Result<DriverConfig, String> {

@@ -156,5 +156,5 @@ fn ask_ollama_stream(window: tauri::Window, model: String, question: String, con
 
 #[cfg(not(feature = "with_tauri"))]
 fn main() {
-    println!("LPC Dev Assistant (tauri disabled). Build with --features with_tauri to enable the GUI.");
+    println!("Local Doc Assistant (tauri disabled). Build with --features with_tauri to enable the GUI.");
 }

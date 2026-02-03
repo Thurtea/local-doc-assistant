@@ -37,7 +37,7 @@ pub struct ContextManager {
 impl ContextManager {
     pub fn new(workspace_root: PathBuf) -> Self {
         let mud_references_path = workspace_root.join("mud-references");
-        let templates_path = workspace_root.join("lpc-dev-assistant").join("templates");
+        let templates_path = workspace_root.join("local-doc-assistant").join("templates");
         let extracted_path = mud_references_path.join("extracted");
 
         Self {

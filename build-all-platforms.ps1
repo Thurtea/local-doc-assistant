@@ -1,4 +1,4 @@
-# LPC Dev Assistant - Multi-Platform Build Script
+# Local Doc Assistant - Multi-Platform Build Script
 # Builds Windows, Linux, and macOS installers
 # Prerequisites: Rust toolchain with targets installed
 
@@ -14,7 +14,7 @@ $timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
 $logDir = "./build-logs-$timestamp"
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 
-Write-Host "LPC Dev Assistant - Multi-Platform Build" -ForegroundColor Cyan
+Write-Host "Local Doc Assistant - Multi-Platform Build" -ForegroundColor Cyan
 Write-Host "Platform: $Platform" -ForegroundColor Cyan
 Write-Host "Log directory: $logDir" -ForegroundColor Gray
 Write-Host ""
@@ -56,11 +56,11 @@ if ($Platform -eq 'windows' -or $Platform -eq 'all') {
     Write-Host ""
     $logFile = Join-Path $logDir "build-windows.log"
     $results['Windows'] = Build-Target -Name "Windows (x86_64)" `
-        -Command "cargo tauri build --target x86_64-pc-windows-msvc" `
-        -LogFile $logFile
+    -Command "cargo tauri build --target x86_64-pc-windows-msvc" `
+    -LogFile $logFile
     
     if ($results['Windows']) {
-        $msiPath = "target\release\bundle\msi\LPC Dev Assistant_0.1.0_x64_en-US.msi"
+        $msiPath = "target\release\bundle\msi\Local Doc Assistant_0.1.0_x64_en-US.msi"
         if (Test-Path $msiPath) {
             $size = (Get-Item $msiPath).Length / 1MB
             Write-Host "  MSI created: $size MB" -ForegroundColor Gray
@@ -145,16 +145,16 @@ Write-Host ""
 # Output paths
 Write-Host "Output Locations:" -ForegroundColor Cyan
 if ($results['Windows']) {
-    Write-Host "  Windows MSI: target\release\bundle\msi\LPC Dev Assistant_0.1.0_x64_en-US.msi" -ForegroundColor Green
-    Write-Host "  Windows EXE: target\release\bundle\nsis\LPC Dev Assistant_0.1.0_x64-setup.exe" -ForegroundColor Green
+    Write-Host "  Windows MSI: target\release\bundle\msi\Local Doc Assistant_0.1.0_x64_en-US.msi" -ForegroundColor Green
+    Write-Host "  Windows EXE: target\release\bundle\nsis\Local Doc Assistant_0.1.0_x64-setup.exe" -ForegroundColor Green
 }
 if ($results['Linux']) {
-    Write-Host "  Linux DEB: target\release\bundle\deb\lpc-dev-assistant_*_amd64.deb" -ForegroundColor Green
-    Write-Host "  Linux AppImage: target\release\bundle\appimage\LPC_Dev_Assistant_*_x64.AppImage" -ForegroundColor Green
+    Write-Host "  Linux DEB: target\release\bundle\deb\local-doc-assistant_*_amd64.deb" -ForegroundColor Green
+    Write-Host "  Linux AppImage: target\release\bundle\appimage\Local_Doc_Assistant_*_x64.AppImage" -ForegroundColor Green
 }
 if ($results['macOS-Intel'] -or $results['macOS-ARM']) {
-    Write-Host "  macOS DMG: target\release\bundle\macos\LPC_Dev_Assistant_*.dmg" -ForegroundColor Green
-    Write-Host "  macOS APP: target\release\bundle\macos\LPC Dev Assistant.app" -ForegroundColor Green
+    Write-Host "  macOS DMG: target\release\bundle\macos\Local_Doc_Assistant_*.dmg" -ForegroundColor Green
+    Write-Host "  macOS APP: target\release\bundle\macos\Local Doc Assistant.app" -ForegroundColor Green
 }
 
 $successCount = ($results.Values | Where-Object { $_ }).Count

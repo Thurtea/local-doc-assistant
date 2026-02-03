@@ -7,18 +7,18 @@ mod tests {
     fn test_path_mapper_basic() {
         // Test that path mapping works correctly
         let mapper = crate::wsl::PathMapper::new(
-            PathBuf::from("E:\\Work\\lpc-development-assistant"),
+            PathBuf::from("E:\\Work\\local-doc-assistant"),
             "/home/thurtea/amlp-driver".to_string(),
             "/home/thurtea/amlp-library".to_string(),
         );
 
         // Test mapping to driver
-        let driver_path = mapper.to_wsl_driver(&PathBuf::from("E:\\Work\\lpc-development-assistant\\src\\test.lpc"));
+        let driver_path = mapper.to_wsl_driver(&PathBuf::from("E:\\Work\\local-doc-assistant\\src\\test.lpc"));
         assert!(driver_path.is_some());
         assert!(driver_path.unwrap().contains("/home/thurtea/amlp-driver"));
 
         // Test mapping to library
-        let lib_path = mapper.to_wsl_library(&PathBuf::from("E:\\Work\\lpc-development-assistant\\lpc\\test.lpc"));
+        let lib_path = mapper.to_wsl_library(&PathBuf::from("E:\\Work\\local-doc-assistant\\lpc\\test.lpc"));
         assert!(lib_path.is_some());
         assert!(lib_path.unwrap().contains("/home/thurtea/amlp-library"));
     }
@@ -39,7 +39,7 @@ mod tests {
 
         // Mock test - just verify the pipeline initializes
         let mapper = Arc::new(PathMapper::new(
-            PathBuf::from("E:\\Work\\lpc-development-assistant"),
+            PathBuf::from("E:\\Work\\local-doc-assistant"),
             "/home/thurtea/amlp-driver".to_string(),
             "/home/thurtea/amlp-library".to_string(),
         ));

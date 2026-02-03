@@ -5,7 +5,7 @@ use local_doc_assistant::ContextManager;
 fn main() -> anyhow::Result<()> {
     let cwd = env::current_dir()?;
     // If running from the lpc-dev-assistant subdirectory, treat parent as workspace root
-    let workspace_root: PathBuf = if cwd.ends_with("lpc-dev-assistant") {
+    let workspace_root: PathBuf = if cwd.ends_with("local-doc-assistant") {
         cwd.parent().unwrap_or(&cwd).to_path_buf()
     } else {
         cwd

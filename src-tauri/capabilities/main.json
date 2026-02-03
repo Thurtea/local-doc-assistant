@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Main capability for LPC Dev Assistant",
+  "description": "Main capability for Local Doc Assistant",
   "windows": ["main"],
   "permissions": [
     "core:default",

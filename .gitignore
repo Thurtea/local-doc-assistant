@@ -64,3 +64,5 @@ app-icon.png
 *.swp
 *.swo
 *~
+# Archive of agent-generated files
+archive/generated-by-agent/

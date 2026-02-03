@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
-use lpc_dev_assistant::{DocumentIndex, PromptBuilder};
+use local_doc_assistant::{DocumentIndex, PromptBuilder};
 
 #[test]
 fn test_mud_reference_index_creation() {
@@ -58,7 +58,7 @@ fn test_prompt_builder_empty() {
     assert!(prompt.is_ok(), "Failed to build empty prompt");
     
     let prompt_text = prompt.unwrap();
-    assert!(prompt_text.contains("LPC MUD"), "Prompt should contain system context");
+    assert!(prompt_text.contains("MUD"), "Prompt should contain system context");
     assert!(prompt_text.contains("test query"), "Prompt should contain user query");
 }
 

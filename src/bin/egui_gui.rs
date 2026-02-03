@@ -1,4 +1,4 @@
-//! LPC MUD Development Assistant - egui Native GUI
+//! Local Doc Assistant - egui Native GUI
 //! 
 //! A working native GUI using egui with actual text selection and copy/paste.
 
@@ -17,7 +17,7 @@ fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions::default();
 
     eframe::run_native(
-        "LPC MUD Development Assistant",
+        "Local Doc Assistant",
         options,
         Box::new(|cc| {
             // Default to light theme
@@ -166,7 +166,7 @@ impl LPCDevApp {
 
     fn load_context(&self) -> String {
         let templates_path = self.workspace_root
-            .join("lpc-dev-assistant")
+            .join("local-doc-assistant")
             .join("templates")
             .join(self.selected_context.filename());
         
@@ -236,7 +236,7 @@ impl LPCDevApp {
             return;
         }
 
-        let gen_path = self.workspace_root.join("lpc-dev-assistant").join("gen");
+        let gen_path = self.workspace_root.join("local-doc-assistant").join("gen");
         if let Err(e) = std::fs::create_dir_all(&gen_path) {
             self.status_message = format!("❌ Failed to create gen/ directory: {}", e);
             return;
@@ -297,7 +297,7 @@ impl eframe::App for LPCDevApp {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             // Title
-            ui.heading("🎮 LPC MUD Development Assistant");
+            ui.heading("Local Doc Assistant");
             ui.add_space(10.0);
 
             // Top controls
@@ -398,7 +398,7 @@ impl eframe::App for LPCDevApp {
                 egui::TextEdit::multiline(&mut self.question)
                     .desired_width(f32::INFINITY)
                     .desired_rows(5)
-                    .hint_text("Ask about LPC driver implementation, mudlib features, or C programming...\n\nExamples:\n- Write the complete lexer.c for LPC tokens\n- Implement the VM bytecode interpreter\n- Create a combat system for the mudlib")
+                    .hint_text("Ask about driver implementation, library features, or C programming...\n\nExamples:\n- Write the complete lexer.c for tokens\n- Implement the VM bytecode interpreter\n- Create a combat system for the library")
                     .font(egui::FontId::monospace(13.0))
             );
 

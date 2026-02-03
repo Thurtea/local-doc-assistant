@@ -2713,10 +2713,15 @@
         statusEl.style.color = 'var(--success)';
         toast('Configuration saved!');
       } catch (error) {
-        statusEl.textContent = `Failed to save config: ${error}`;
-        statusEl.style.borderColor = 'var(--error)';
-        statusEl.style.color = 'var(--error)';
-        toast(`Save failed: ${error}`);
+        const errMsg = (error && error.message) ? error.message : String(error);
+        if (statusEl) {
+          statusEl.textContent = `Failed to save config: ${errMsg}`;
+          statusEl.style.borderColor = 'var(--error)';
+          statusEl.style.color = 'var(--error)';
+        } else {
+          console.warn('paths-config-status element missing when saving config:', errMsg);
+        }
+        toast(`Save failed: ${errMsg}`);
       }
     });
   </script>
